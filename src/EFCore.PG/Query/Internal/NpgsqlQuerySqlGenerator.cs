@@ -47,19 +47,21 @@ public class NpgsqlQuerySqlGenerator : QuerySqlGenerator
     protected override Expression VisitExtension(Expression extensionExpression)
         => extensionExpression switch
         {
-            PostgresAllExpression allExpression                     => VisitArrayAll(allExpression),
-            PostgresAnyExpression anyExpression                     => VisitArrayAny(anyExpression),
-            PostgresArrayIndexExpression arrayIndexExpression       => VisitArrayIndex(arrayIndexExpression),
-            PostgresBinaryExpression binaryExpression               => VisitPostgresBinary(binaryExpression),
-            PostgresDeleteExpression deleteExpression               => VisitPostgresDelete(deleteExpression),
-            PostgresFunctionExpression functionExpression           => VisitPostgresFunction(functionExpression),
-            PostgresILikeExpression iLikeExpression                 => VisitILike(iLikeExpression),
-            PostgresJsonTraversalExpression jsonTraversalExpression => VisitJsonPathTraversal(jsonTraversalExpression),
-            PostgresNewArrayExpression newArrayExpression           => VisitPostgresNewArray(newArrayExpression),
-            PostgresRegexMatchExpression regexMatchExpression       => VisitRegexMatch(regexMatchExpression),
-            PostgresRowValueExpression rowValueExpression           => VisitRowValue(rowValueExpression),
-            PostgresUnknownBinaryExpression unknownBinaryExpression => VisitUnknownBinary(unknownBinaryExpression),
-            _                                                       => base.VisitExtension(extensionExpression)
+            PostgresAllExpression e => VisitArrayAll(e),
+            PostgresAnyExpression e => VisitArrayAny(e),
+            PostgresArrayIndexExpression e => VisitArrayIndex(e),
+            PostgresArraySliceExpression e => VisitArraySlice(e),
+            PostgresBinaryExpression e => VisitPostgresBinary(e),
+            PostgresDeleteExpression e => VisitPostgresDelete(e),
+            PostgresFunctionExpression e => VisitPostgresFunction(e),
+            PostgresILikeExpression e => VisitILike(e),
+            PostgresJsonTraversalExpression e => VisitJsonPathTraversal(e),
+            PostgresNewArrayExpression e => VisitPostgresNewArray(e),
+            PostgresRegexMatchExpression e => VisitRegexMatch(e),
+            PostgresRowValueExpression e => VisitRowValue(e),
+            PostgresUnknownBinaryExpression e => VisitUnknownBinary(e),
+            PostgresUnnestExpression e => VisitUnnestExpression(e),
+            _ => base.VisitExtension(extensionExpression)
         };
 
     /// <inheritdoc />
@@ -110,12 +112,14 @@ public class NpgsqlQuerySqlGenerator : QuerySqlGenerator
         => e.OperatorType switch
         {
             // PostgreSQL has a special string concatenation operator: ||
-            // We switch to it if the expression itself has type string, or if one of the sides has a
-            // string type mapping. Same for full-text search's TsVector.
+            // We switch to it if the expression itself has type string, or if one of the sides has a string type mapping.
+            // Same for full-text search's TsVector, arrays.
             ExpressionType.Add when
                 e.Type == typeof(string) || e.Left.TypeMapping?.ClrType == typeof(string) || e.Right.TypeMapping?.ClrType == typeof(string) ||
-                e.Type == typeof(NpgsqlTsVector) || e.Left.TypeMapping?.ClrType == typeof(NpgsqlTsVector) || e.Right.TypeMapping?.ClrType == typeof(NpgsqlTsVector)
+                e.Type == typeof(NpgsqlTsVector) || e.Left.TypeMapping?.ClrType == typeof(NpgsqlTsVector) || e.Right.TypeMapping?.ClrType == typeof(NpgsqlTsVector) ||
+                e.Left.TypeMapping is NpgsqlArrayTypeMapping && e.Right.TypeMapping is NpgsqlArrayTypeMapping
                 => " || ",
+
             ExpressionType.And when e.Type == typeof(bool)   => " AND ",
             ExpressionType.Or  when e.Type == typeof(bool)   => " OR ",
             _ => base.GetOperator(e)
@@ -438,16 +442,16 @@ public class NpgsqlQuerySqlGenerator : QuerySqlGenerator
     {
         Check.NotNull(binaryExpression, nameof(binaryExpression));
 
-        var requiresBrackets = RequiresBrackets(binaryExpression.Left);
+        var requiresParentheses = RequiresParentheses(binaryExpression, binaryExpression.Left);
 
-        if (requiresBrackets)
+        if (requiresParentheses)
         {
             Sql.Append("(");
         }
 
         Visit(binaryExpression.Left);
 
-        if (requiresBrackets)
+        if (requiresParentheses)
         {
             Sql.Append(")");
         }
@@ -460,13 +464,11 @@ public class NpgsqlQuerySqlGenerator : QuerySqlGenerator
             .Append(binaryExpression.OperatorType switch
             {
                 PostgresExpressionType.Contains
-                    when binaryExpression.Left.TypeMapping is NpgsqlInetTypeMapping ||
-                    binaryExpression.Left.TypeMapping is NpgsqlCidrTypeMapping
+                    when binaryExpression.Left.TypeMapping is NpgsqlInetTypeMapping or NpgsqlCidrTypeMapping
                     => ">>",
 
                 PostgresExpressionType.ContainedBy
-                    when binaryExpression.Left.TypeMapping is NpgsqlInetTypeMapping ||
-                    binaryExpression.Left.TypeMapping is NpgsqlCidrTypeMapping
+                    when binaryExpression.Left.TypeMapping is NpgsqlInetTypeMapping or NpgsqlCidrTypeMapping
                     => "<<",
 
                 PostgresExpressionType.Contains    => "@>",
@@ -496,9 +498,7 @@ public class NpgsqlQuerySqlGenerator : QuerySqlGenerator
 
                 PostgresExpressionType.LTreeMatches
                     when binaryExpression.Right.TypeMapping.StoreType == "lquery" ||
-                    binaryExpression.Right.TypeMapping is NpgsqlArrayTypeMapping arrayMapping &&
-                    arrayMapping.ElementMapping.StoreType == "lquery"
-                    => "~",
+                    binaryExpression.Right.TypeMapping is NpgsqlArrayTypeMapping { ElementTypeMapping.StoreType: "lquery" } => "~",
                 PostgresExpressionType.LTreeMatches
                     when binaryExpression.Right.TypeMapping.StoreType == "ltxtquery"
                     => "@",
@@ -516,16 +516,16 @@ public class NpgsqlQuerySqlGenerator : QuerySqlGenerator
             })
             .Append(" ");
 
-        requiresBrackets = RequiresBrackets(binaryExpression.Right);
+        requiresParentheses = RequiresParentheses(binaryExpression, binaryExpression.Right);
 
-        if (requiresBrackets)
+        if (requiresParentheses)
         {
             Sql.Append("(");
         }
 
         Visit(binaryExpression.Right);
 
-        if (requiresBrackets)
+        if (requiresParentheses)
         {
             Sql.Append(")");
         }
@@ -638,18 +638,138 @@ public class NpgsqlQuerySqlGenerator : QuerySqlGenerator
     ///     any release. You should only use it directly in your code with extreme caution and knowing that
     ///     doing so can result in application failures when updating to a new Entity Framework Core release.
     /// </summary>
-    protected override Expression VisitCollate(CollateExpression collateExpresion)
+    protected override Expression VisitCollate(CollateExpression collateExpression)
     {
-        Check.NotNull(collateExpresion, nameof(collateExpresion));
+        Check.NotNull(collateExpression, nameof(collateExpression));
 
-        Visit(collateExpresion.Operand);
+        Visit(collateExpression.Operand);
 
+        // In PG, collation names are regular identifiers which need to be quoted for case-sensitivity.
         Sql
             .Append(" COLLATE ")
-            .Append(_sqlGenerationHelper.DelimitIdentifier(collateExpresion.Collation));
+            .Append(_sqlGenerationHelper.DelimitIdentifier(collateExpression.Collation));
 
-        return collateExpresion;
+        return collateExpression;
     }
+
+    /// <summary>
+    ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+    ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+    ///     any release. You should only use it directly in your code with extreme caution and knowing that
+    ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+    /// </summary>
+    protected override bool TryGenerateWithoutWrappingSelect(SelectExpression selectExpression)
+        // PostgreSQL supports VALUES as a top-level statement - and directly under set operations.
+        // However, when on the left side of a set operation, we need the column coming out of VALUES to be named, so we need the wrapping
+        // SELECT for that.
+        => selectExpression.Tables is not [ValuesExpression]
+            && base.TryGenerateWithoutWrappingSelect(selectExpression);
+
+    /// <summary>
+    ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+    ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+    ///     any release. You should only use it directly in your code with extreme caution and knowing that
+    ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+    /// </summary>
+    protected override void GenerateSetOperation(SetOperationBase setOperation)
+    {
+        GenerateSetOperationOperand(setOperation, setOperation.Source1);
+
+        Sql
+            .AppendLine()
+            .Append(
+                setOperation switch
+                {
+                    ExceptExpression => "EXCEPT",
+                    IntersectExpression => "INTERSECT",
+                    UnionExpression => "UNION",
+                    _ => throw new InvalidOperationException(CoreStrings.UnknownEntity("SetOperationType"))
+                })
+            .AppendLine(setOperation.IsDistinct ? string.Empty : " ALL");
+
+        // For ValuesExpression, we can remove its wrapping SelectExpression but only if on the right side of a set operation, since on
+        // the left side we need the column name to be specified.
+        if (setOperation.Source2 is
+            {
+                Tables: [ValuesExpression valuesExpression],
+                Offset: null,
+                Limit: null,
+                IsDistinct: false,
+                Predicate: null,
+                Having: null,
+                Orderings.Count: 0,
+                GroupBy.Count: 0,
+            } rightSelectExpression
+            && rightSelectExpression.Projection.Count == valuesExpression.ColumnNames.Count
+            && rightSelectExpression.Projection.Select(
+                    (pe, index) => pe.Expression is ColumnExpression column
+                        && column.Name == valuesExpression.ColumnNames[index])
+                .All(e => e))
+        {
+            GenerateValues(valuesExpression);
+        }
+        else
+        {
+            GenerateSetOperationOperand(setOperation, setOperation.Source2);
+        }
+    }
+
+    /// <summary>
+    ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+    ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+    ///     any release. You should only use it directly in your code with extreme caution and knowing that
+    ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+    /// </summary>
+    protected override Expression VisitValues(ValuesExpression valuesExpression)
+    {
+        base.VisitValues(valuesExpression);
+
+        // PostgreSQL VALUES supports setting the projects column names: FROM (VALUES (1), (2)) AS v(foo)
+        Sql.Append("(");
+
+        for (var i = 0; i < valuesExpression.ColumnNames.Count; i++)
+        {
+            if (i > 0)
+            {
+                Sql.Append(", ");
+            }
+
+            Sql.Append(_sqlGenerationHelper.DelimitIdentifier(valuesExpression.ColumnNames[i]));
+        }
+
+        Sql.Append(")");
+
+        return valuesExpression;
+    }
+
+    /// <summary>
+    ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+    ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+    ///     any release. You should only use it directly in your code with extreme caution and knowing that
+    ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+    /// </summary>
+    protected override void GenerateValues(ValuesExpression valuesExpression)
+    {
+        // PostgreSQL supports providing the names of columns projected out of VALUES: (VALUES (1, 3), (2, 4)) AS x(a, b).
+        // But since other databases sometimes don't, the default relational implementation is complex, involving a SELECT for the first row
+        // and a UNION All on the rest. Override to do the nice simple thing.
+        var rowValues = valuesExpression.RowValues;
+
+        Sql.Append("VALUES ");
+
+        for (var i = 0; i < rowValues.Count; i++)
+        {
+            // TODO: Do we want newlines here?
+            if (i > 0)
+            {
+                Sql.Append(", ");
+            }
+
+            Visit(valuesExpression.RowValues[i]);
+        }
+    }
+
+    #region PostgreSQL-specific expression types
 
     /// <summary>
     ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
@@ -714,6 +834,20 @@ public class NpgsqlQuerySqlGenerator : QuerySqlGenerator
         Visit(expression.Array);
         Sql.Append("[");
         Visit(expression.Index);
+        Sql.Append("]");
+        return expression;
+    }
+
+    /// <summary>
+    /// Produces SQL array slice expression (e.g. arr[1:2]).
+    /// </summary>
+    public virtual Expression VisitArraySlice(PostgresArraySliceExpression expression)
+    {
+        Visit(expression.Array);
+        Sql.Append("[");
+        Visit(expression.LowerBound);
+        Sql.Append(":");
+        Visit(expression.UpperBound);
         Sql.Append("]");
         return expression;
     }
@@ -892,6 +1026,27 @@ public class NpgsqlQuerySqlGenerator : QuerySqlGenerator
     }
 
     /// <summary>
+    ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+    ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+    ///     any release. You should only use it directly in your code with extreme caution and knowing that
+    ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+    /// </summary>
+    protected virtual Expression VisitUnnestExpression(PostgresUnnestExpression unnestExpression)
+    {
+        // unnest docs: https://www.postgresql.org/docs/current/functions-array.html#ARRAY-FUNCTIONS-TABLE
+
+        // unnest is a regular table-valued function with a special AS foo(bar) at the end
+        base.VisitTableValuedFunction(unnestExpression);
+
+        Sql
+            .Append("(")
+            .Append(unnestExpression.ColumnName)
+            .Append(")");
+
+        return unnestExpression;
+    }
+
+    /// <summary>
     /// Visits the children of a <see cref="PostgresUnknownBinaryExpression"/>.
     /// </summary>
     /// <param name="unknownBinaryExpression">The expression.</param>
@@ -902,16 +1057,16 @@ public class NpgsqlQuerySqlGenerator : QuerySqlGenerator
     {
         Check.NotNull(unknownBinaryExpression, nameof(unknownBinaryExpression));
 
-        var requiresBrackets = RequiresBrackets(unknownBinaryExpression.Left);
+        var requiresParentheses = RequiresParentheses(unknownBinaryExpression, unknownBinaryExpression.Left);
 
-        if (requiresBrackets)
+        if (requiresParentheses)
         {
             Sql.Append("(");
         }
 
         Visit(unknownBinaryExpression.Left);
 
-        if (requiresBrackets)
+        if (requiresParentheses)
         {
             Sql.Append(")");
         }
@@ -921,16 +1076,16 @@ public class NpgsqlQuerySqlGenerator : QuerySqlGenerator
             .Append(unknownBinaryExpression.Operator)
             .Append(" ");
 
-        requiresBrackets = RequiresBrackets(unknownBinaryExpression.Right);
+        requiresParentheses = RequiresParentheses(unknownBinaryExpression, unknownBinaryExpression.Right);
 
-        if (requiresBrackets)
+        if (requiresParentheses)
         {
             Sql.Append("(");
         }
 
         Visit(unknownBinaryExpression.Right);
 
-        if (requiresBrackets)
+        if (requiresParentheses)
         {
             Sql.Append(")");
         }
@@ -1023,8 +1178,134 @@ public class NpgsqlQuerySqlGenerator : QuerySqlGenerator
         return e;
     }
 
-    private static bool RequiresBrackets(SqlExpression expression)
-        => expression is SqlBinaryExpression || expression is LikeExpression || expression is PostgresBinaryExpression;
+    #endregion PostgreSQL-specific expression types
+
+    /// <summary>
+    ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+    ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+    ///     any release. You should only use it directly in your code with extreme caution and knowing that
+    ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+    /// </summary>
+    protected override bool RequiresParentheses(SqlExpression outerExpression, SqlExpression innerExpression)
+    {
+        switch (innerExpression)
+        {
+            // PG doesn't support ~-, -~, ~~, -- so we add parentheses
+            case SqlUnaryExpression innerUnary when outerExpression is SqlUnaryExpression outerUnary
+                && (innerUnary.OperatorType is ExpressionType.Negate || innerUnary.OperatorType is ExpressionType.Not && innerUnary.Type != typeof(bool))
+                && (outerUnary.OperatorType is ExpressionType.Negate || outerUnary.OperatorType is ExpressionType.Not && outerUnary.Type != typeof(bool)):
+                return true;
+
+            // Copy paste of QuerySqlGenerator.RequiresParentheses for SqlBinaryExpression
+            case PostgresBinaryExpression innerBinary:
+            {
+                // If the provider defined precedence for the two expression, use that
+                if (TryGetOperatorInfo(outerExpression, out var outerPrecedence, out var isOuterAssociative)
+                    && TryGetOperatorInfo(innerExpression, out var innerPrecedence, out _))
+                {
+                    return outerPrecedence.CompareTo(innerPrecedence) switch
+                    {
+                        > 0 => true,
+                        < 0 => false,
+
+                        // If both operators have the same precedence, add parentheses unless they're the same operator, and
+                        // that operator is associative (e.g. a + b + c)
+                        0 => outerExpression is not PostgresBinaryExpression outerBinary
+                            || outerBinary.OperatorType != innerBinary.OperatorType
+                            || !isOuterAssociative
+                            // Arithmetic operators on floating points aren't associative, because of rounding errors.
+                            || outerExpression.Type == typeof(float)
+                            || outerExpression.Type == typeof(double)
+                            || innerExpression.Type == typeof(float)
+                            || innerExpression.Type == typeof(double)
+                    };
+                }
+
+                // Otherwise always parenthesize for safety
+                return true;
+            }
+
+            default:
+                return base.RequiresParentheses(outerExpression, innerExpression);
+        }
+    }
+
+    /// <summary>
+    ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+    ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+    ///     any release. You should only use it directly in your code with extreme caution and knowing that
+    ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+    /// </summary>
+    protected override bool TryGetOperatorInfo(SqlExpression expression, out int precedence, out bool isAssociative)
+    {
+        // See https://www.postgresql.org/docs/current/sql-syntax-lexical.html#SQL-PRECEDENCE
+        (precedence, isAssociative) = expression switch
+        {
+            // TODO: Exponent => 1300
+
+            SqlBinaryExpression sqlBinaryExpression => sqlBinaryExpression.OperatorType switch
+            {
+                // Multiplication, division, modulo
+                ExpressionType.Multiply => (1200, true),
+                ExpressionType.Divide => (1200, false),
+                ExpressionType.Modulo => (1200, false),
+
+                // Addition, subtraction (binary)
+                ExpressionType.Add => (1100, true),
+                ExpressionType.Subtract => (1100, false),
+
+                // All other native and user-defined operators => 1000
+                ExpressionType.LeftShift => (1000, true),
+                ExpressionType.RightShift => (1000, true),
+                ExpressionType.And when sqlBinaryExpression.Type != typeof(bool) => (1000, true),
+                ExpressionType.Or when sqlBinaryExpression.Type != typeof(bool) => (1000, true),
+
+                // Comparison operators
+                ExpressionType.Equal => (800, false),
+                ExpressionType.NotEqual => (800, false),
+                ExpressionType.LessThan => (800, false),
+                ExpressionType.LessThanOrEqual => (800, false),
+                ExpressionType.GreaterThan => (800, false),
+                ExpressionType.GreaterThanOrEqual => (800, false),
+
+                // Logical operators
+                ExpressionType.AndAlso => (500, true),
+                ExpressionType.OrElse => (500, true),
+                ExpressionType.And when sqlBinaryExpression.Type == typeof(bool) => (500, true),
+                ExpressionType.Or when sqlBinaryExpression.Type == typeof(bool) => (500, true),
+
+                _ => default,
+            },
+
+            SqlUnaryExpression sqlUnaryExpression => sqlUnaryExpression.OperatorType switch
+            {
+                ExpressionType.Convert => (1600, false),
+                ExpressionType.Negate => (1400, false),
+                ExpressionType.Not when sqlUnaryExpression.Type != typeof(bool) => (1000, false),
+                ExpressionType.Equal => (700, false), // IS NULL
+                ExpressionType.NotEqual => (700, false), // IS NOT NULL
+                ExpressionType.Not when sqlUnaryExpression.Type == typeof(bool) => (600, false),
+
+                _ => default,
+            },
+
+            // There's an "any other operator" category in the PG operator precedence table, we assign that a numeric value of 1000.
+            // TODO: Some operators here may be associative
+            PostgresBinaryExpression => (1000, false),
+
+            CollateExpression => (1000, false),
+            AtTimeZoneExpression => (1000, false),
+            InExpression => (900, false),
+            PostgresJsonTraversalExpression => (1000, false),
+            PostgresArrayIndexExpression => (1500, false),
+            PostgresAllExpression or PostgresAnyExpression => (800, false),
+            LikeExpression or PostgresILikeExpression or PostgresRegexMatchExpression => (900, false),
+
+            _ => default,
+        };
+
+        return precedence != default;
+    }
 
     private void GenerateList<T>(
         IReadOnlyList<T> items,

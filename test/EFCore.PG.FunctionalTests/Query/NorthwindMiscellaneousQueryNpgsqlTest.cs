@@ -53,7 +53,7 @@ WHERE o."OrderDate" IS NOT NULL
 """
 @__years_0='2'
 
-SELECT o."OrderDate" + CAST((@__years_0::text || ' years') AS interval) AS "OrderDate"
+SELECT o."OrderDate" + CAST(@__years_0::text || ' years' AS interval) AS "OrderDate"
 FROM "Orders" AS o
 WHERE o."OrderDate" IS NOT NULL
 """);
@@ -72,7 +72,7 @@ WHERE o."OrderDate" IS NOT NULL
 """
 SELECT o."OrderID", o."CustomerID", o."EmployeeID", o."OrderDate"
 FROM "Orders" AS o
-WHERE (o."OrderDate" - INTERVAL '1 00:00:00') = TIMESTAMP '1997-10-08 00:00:00'
+WHERE o."OrderDate" - INTERVAL '1 00:00:00' = TIMESTAMP '1997-10-08 00:00:00'
 """);
     }
 
@@ -242,7 +242,7 @@ WHERE c."CustomerID" IN ('ALFKI', 'ANATR')
 
 SELECT c."CustomerID", c."Address", c."City", c."CompanyName", c."ContactName", c."ContactTitle", c."Country", c."Fax", c."Phone", c."PostalCode", c."Region"
 FROM "Customers" AS c
-WHERE c."Region" = ANY (@__regions_0) OR ((c."Region" IS NULL) AND (array_position(@__regions_0, NULL) IS NOT NULL))
+WHERE c."Region" = ANY (@__regions_0) OR (c."Region" IS NULL AND array_position(@__regions_0, NULL) IS NOT NULL)
 """);
     }
 
@@ -267,7 +267,7 @@ WHERE c."Region" = ANY (@__regions_0) OR ((c."Region" IS NULL) AND (array_positi
 
 SELECT c."CustomerID", c."Address", c."City", c."CompanyName", c."ContactName", c."ContactTitle", c."Country", c."Fax", c."Phone", c."PostalCode", c."Region"
 FROM "Customers" AS c
-WHERE c."Region" = ANY (@__regions_0) OR ((c."Region" IS NULL) AND (array_position(@__regions_0, NULL) IS NOT NULL))
+WHERE c."Region" = ANY (@__regions_0) OR (c."Region" IS NULL AND array_position(@__regions_0, NULL) IS NOT NULL)
 """);
     }
 
@@ -279,7 +279,7 @@ WHERE c."Region" = ANY (@__regions_0) OR ((c."Region" IS NULL) AND (array_positi
     [MemberData(nameof(IsAsyncData))]
     public async Task Array_Any_Like(bool async)
     {
-        using var context = CreateContext();
+        await using var context = CreateContext();
 
         var collection = new[] { "A%", "B%", "C%" };
         var query = context.Set<Customer>().Where(c => collection.Any(y => EF.Functions.Like(c.Address, y)));
@@ -305,7 +305,7 @@ WHERE c."Address" LIKE ANY (@__collection_0)
     [MemberData(nameof(IsAsyncData))]
     public async Task Array_All_Like(bool async)
     {
-        using var context = CreateContext();
+        await using var context = CreateContext();
 
         var collection = new[] { "A%", "B%", "C%" };
         var query = context.Set<Customer>().Where(c => collection.All(y => EF.Functions.Like(c.Address, y)));
@@ -327,7 +327,7 @@ WHERE c."Address" LIKE ALL (@__collection_0)
     [MemberData(nameof(IsAsyncData))]
     public async Task Array_Any_ILike(bool async)
     {
-        using var context = CreateContext();
+        await using var context = CreateContext();
 
         var collection = new[] { "a%", "b%", "c%" };
         var query = context.Set<Customer>().Where(c => collection.Any(y => EF.Functions.ILike(c.Address, y)));
@@ -353,7 +353,7 @@ WHERE c."Address" ILIKE ANY (@__collection_0)
     [MemberData(nameof(IsAsyncData))]
     public async Task Array_All_ILike(bool async)
     {
-        using var context = CreateContext();
+        await using var context = CreateContext();
 
         var collection = new[] { "a%", "b%", "c%" };
         var query = context.Set<Customer>().Where(c => collection.All(y => EF.Functions.ILike(c.Address, y)));

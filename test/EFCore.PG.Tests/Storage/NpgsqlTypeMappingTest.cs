@@ -14,6 +14,26 @@ namespace Npgsql.EntityFrameworkCore.PostgreSQL.Storage;
 
 public class NpgsqlTypeMappingTest
 {
+    #region Numeric
+
+    [Fact]
+    public void GenerateSqlLiteral_returns_decimal_literal()
+    {
+        Assert.Equal(
+            "1.878787",
+            GetMapping(typeof(decimal), "numeric").GenerateSqlLiteral(1.878787m));
+
+        Assert.Equal(
+            "1.878787",
+            GetMapping(typeof(float), "numeric").GenerateSqlLiteral(1.878787m));
+
+        Assert.Equal(
+            "1.878787",
+            GetMapping(typeof(double), "numeric").GenerateSqlLiteral(1.878787m));
+    }
+
+    #endregion Numeric
+
     #region Date/Time
 
     [Fact]
@@ -239,7 +259,7 @@ public class NpgsqlTypeMappingTest
 
     [Fact]
     public void GenerateCodeLiteral_returns_cidr_literal()
-        => Assert.Equal(@"new System.ValueTuple<System.Net.IPAddress, int>(System.Net.IPAddress.Parse(""192.168.1.0""), 24)", CodeLiteral((IPAddress.Parse("192.168.1.0"), 24)));
+        => Assert.Equal(@"(System.Net.IPAddress.Parse(""192.168.1.0""), 24)", CodeLiteral((IPAddress.Parse("192.168.1.0"), 24)));
 
     #endregion Networking
 
@@ -351,7 +371,7 @@ public class NpgsqlTypeMappingTest
     public void GenerateCodeLiteral_returns_bit_literal()
         => Assert.Equal("new System.Collections.BitArray(new bool[] { true, false })", CodeLiteral(new BitArray(new[] { true, false })));
 
-    [Fact]
+    [Fact(Skip = "https://github.com/dotnet/efcore/pull/30939")]
     public void ValueComparer_hstore_array()
     {
         // This exercises array's comparer when the element has its own non-null comparer
@@ -366,7 +386,7 @@ public class NpgsqlTypeMappingTest
         Assert.Equal(source, snapshot);
         Assert.NotSame(source, snapshot);
         Assert.True(comparer.Equals(source, snapshot));
-        snapshot[1]["k2"] = "v8";
+        source[1]["k2"] = "v8";
         Assert.False(comparer.Equals(source, snapshot));
     }
 
@@ -485,7 +505,7 @@ public class NpgsqlTypeMappingTest
     public void GenerateSqlLiteral_returns_array_empty_literal()
         => Assert.Equal("ARRAY[]::smallint[]", GetMapping(typeof(short[])).GenerateSqlLiteral(Array.Empty<short>()));
 
-    [Fact]
+    [Fact(Skip = "https://github.com/dotnet/efcore/pull/30939")]
     public void ValueComparer_int_array()
     {
         // This exercises array's comparer when the element doesn't have a comparer, but it implements
@@ -501,7 +521,7 @@ public class NpgsqlTypeMappingTest
         Assert.False(comparer.Equals(source, snapshot));
     }
 
-    [Fact]
+    [Fact(Skip = "https://github.com/dotnet/efcore/pull/30939")]
     public void ValueComparer_int_list()
     {
         var source = new List<int> { 2, 3, 4 };
@@ -515,7 +535,7 @@ public class NpgsqlTypeMappingTest
         Assert.False(comparer.Equals(source, snapshot));
     }
 
-    [Fact]
+    [Fact(Skip = "https://github.com/dotnet/efcore/pull/30939")]
     public void ValueComparer_nullable_int_array()
     {
         var source = new int?[] { 2, 3, 4, null };
@@ -529,7 +549,7 @@ public class NpgsqlTypeMappingTest
         Assert.False(comparer.Equals(source, snapshot));
     }
 
-    [Fact]
+    [Fact(Skip = "https://github.com/dotnet/efcore/pull/30939")]
     public void ValueComparer_nullable_int_list()
     {
         var source = new List<int?> { 2, 3, 4, null };
@@ -543,7 +563,7 @@ public class NpgsqlTypeMappingTest
         Assert.False(comparer.Equals(source, snapshot));
     }
 
-    [Fact]
+    [Fact(Skip = "https://github.com/dotnet/efcore/pull/30939")]
     public void ValueComparer_nullable_array_with_iequatable_element()
     {
         var source = new NpgsqlPoint?[] { new NpgsqlPoint(1, 1), null };

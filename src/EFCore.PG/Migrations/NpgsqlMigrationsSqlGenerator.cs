@@ -169,7 +169,7 @@ public class NpgsqlMigrationsSqlGenerator : MigrationsSqlGenerator
 
         builder.Append("CREATE ");
 
-        if (operation[NpgsqlAnnotationNames.UnloggedTable] is bool unlogged && unlogged)
+        if (operation[NpgsqlAnnotationNames.UnloggedTable] is true)
         {
             builder.Append("UNLOGGED ");
         }
@@ -312,8 +312,8 @@ public class NpgsqlMigrationsSqlGenerator : MigrationsSqlGenerator
         }
 
         // Unlogged table (null is equivalent to false)
-        var oldUnlogged = operation.OldTable[NpgsqlAnnotationNames.UnloggedTable] is bool ou && ou;
-        var newUnlogged = operation[NpgsqlAnnotationNames.UnloggedTable] is bool nu && nu;
+        var oldUnlogged = operation.OldTable[NpgsqlAnnotationNames.UnloggedTable] is true;
+        var newUnlogged = operation[NpgsqlAnnotationNames.UnloggedTable] is true;
 
         if (oldUnlogged != newUnlogged)
         {
@@ -511,14 +511,14 @@ public class NpgsqlMigrationsSqlGenerator : MigrationsSqlGenerator
             builder.AppendLine(";");
         }
 
-        if (operation.IsNullable && !operation.OldColumn.IsNullable)
+        if (operation is { IsNullable: true, OldColumn.IsNullable: false })
         {
             builder
                 .Append(alterBase)
                 .Append("DROP NOT NULL")
                 .AppendLine(";");
         }
-        else if (!operation.IsNullable && operation.OldColumn.IsNullable)
+        else if (operation is { IsNullable: false, OldColumn.IsNullable: true })
         {
             // The column is being made non-nullable. Generate an update statement before doing that, to convert any existing null values to
             // the default value (otherwise PostgreSQL fails).
@@ -828,6 +828,42 @@ public class NpgsqlMigrationsSqlGenerator : MigrationsSqlGenerator
             operation.NewSchema != operation.Schema)
         {
             Transfer(operation.NewSchema, operation.Schema, name, "SEQUENCE", builder);
+        }
+
+        EndStatement(builder);
+    }
+
+    /// <inheritdoc />
+    protected override void Generate(RestartSequenceOperation operation, IModel? model, MigrationCommandListBuilder builder)
+    {
+        // PostgreSQL has ALTER SEQUENCE ... RESTART WITH x, which resets the current sequence value but does not change its start value
+        // in the schema (so a subsequence RESTART without an argument resets it back to its original start value, not to x).
+        // It also has ALTER SEQUENCE ... STARTS WITH x, which resets the schema start value but not the current value.
+        // So we use both statements to reset both the current value and the schema value.
+        if (operation.StartValue.HasValue)
+        {
+            var longTypeMapping = Dependencies.TypeMappingSource.GetMapping(typeof(long));
+
+            builder
+                .Append("ALTER SEQUENCE ")
+                .Append(Dependencies.SqlGenerationHelper.DelimitIdentifier(operation.Name, operation.Schema))
+                .Append(" START WITH ")
+                .Append(longTypeMapping.GenerateSqlLiteral(operation.StartValue.Value))
+                .AppendLine(Dependencies.SqlGenerationHelper.StatementTerminator);
+
+            builder
+                .Append("ALTER SEQUENCE ")
+                .Append(Dependencies.SqlGenerationHelper.DelimitIdentifier(operation.Name, operation.Schema))
+                .Append(" RESTART")
+                .AppendLine(Dependencies.SqlGenerationHelper.StatementTerminator);
+        }
+        else
+        {
+            builder
+                .Append("ALTER SEQUENCE ")
+                .Append(Dependencies.SqlGenerationHelper.DelimitIdentifier(operation.Name, operation.Schema))
+                .Append(" RESTART")
+                .AppendLine(Dependencies.SqlGenerationHelper.StatementTerminator);
         }
 
         EndStatement(builder);
@@ -1602,7 +1638,10 @@ public class NpgsqlMigrationsSqlGenerator : MigrationsSqlGenerator
         }
         else
         {
-            builder.Append(operation.IsNullable ? " NULL" : " NOT NULL");
+            if (!operation.IsNullable)
+            {
+                builder.Append(" NOT NULL");
+            }
 
             DefaultValue(operation.DefaultValue, operation.DefaultValueSql, columnType, builder);
         }
@@ -1802,6 +1841,11 @@ public class NpgsqlMigrationsSqlGenerator : MigrationsSqlGenerator
             .Append(" GENERATED ALWAYS AS (")
             .Append(operation.ComputedColumnSql!)
             .Append(") STORED");
+
+        if (!operation.IsNullable)
+        {
+            builder.Append(" NOT NULL");
+        }
     }
 
 #pragma warning disable 618
@@ -1920,7 +1964,8 @@ public class NpgsqlMigrationsSqlGenerator : MigrationsSqlGenerator
 
     #region System column utilities
 
-    private bool IsSystemColumn(string name) => SystemColumnNames.Contains(name);
+    private bool IsSystemColumn(string name)
+        => name == "oid" && _postgresVersion.IsUnder(12) || SystemColumnNames.Contains(name);
 
     /// <summary>
     /// Tables in PostgreSQL implicitly have a set of system columns, which are always there.
@@ -1930,7 +1975,7 @@ public class NpgsqlMigrationsSqlGenerator : MigrationsSqlGenerator
     /// <remarks>
     /// https://www.postgresql.org/docs/current/static/ddl-system-columns.html
     /// </remarks>
-    private static readonly string[] SystemColumnNames = { "oid", "tableoid", "xmin", "cmin", "xmax", "cmax", "ctid" };
+    private static readonly string[] SystemColumnNames = { "tableoid", "xmin", "cmin", "xmax", "cmax", "ctid" };
 
     #endregion System column utilities
 
@@ -2001,7 +2046,7 @@ public class NpgsqlMigrationsSqlGenerator : MigrationsSqlGenerator
 
             // Of the built-in access methods, only btree (the default) supports
             // sorting, thus we only want to emit sort options for btree indexes.
-            if (method is null || method == "btree")
+            if (method is null or "btree")
             {
                 if (column.IsDescending)
                 {
@@ -2105,11 +2150,11 @@ public class NpgsqlMigrationsSqlGenerator : MigrationsSqlGenerator
         var collations = operation[RelationalAnnotationNames.Collation] as string[];
 
         var operators = operation[NpgsqlAnnotationNames.IndexOperators] as string[];
-        
+
         // We used to have our own annotation-based descending index mechanism, this got replaced with IsDescending in EF Core 7.0.
         var isDescendingValues = operation.IsDescending;
         var legacySortOrders = operation[NpgsqlAnnotationNames.IndexSortOrder] as SortOrder[];
-        
+
         var nullSortOrders = operation[NpgsqlAnnotationNames.IndexNullSortOrder] as NullSortOrder[];
 
         var columns = new IndexColumn[operation.Columns.Length];

@@ -13,9 +13,9 @@ public interface INpgsqlSingletonOptions : ISingletonOptions
     Version PostgresVersion { get; }
 
     /// <summary>
-    ///     The backend version to target, but returns <see langword="null" /> unless the user explicitly specified a version.
+    ///     Whether the user has explicitly set the backend version to target.
     /// </summary>
-    Version? PostgresVersionWithoutDefault { get; }
+    bool IsPostgresVersionSet { get; }
 
     /// <summary>
     ///     Whether to target Redshift.
@@ -36,4 +36,9 @@ public interface INpgsqlSingletonOptions : ISingletonOptions
     ///     The collection of range mappings.
     /// </summary>
     IReadOnlyList<UserRangeDefinition> UserRangeDefinitions { get; }
+
+    /// <summary>
+    ///     The root service provider for the application, if available. />.
+    /// </summary>
+    IServiceProvider? ApplicationServiceProvider { get; }
 }

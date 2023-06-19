@@ -162,7 +162,7 @@ LIMIT 2
 """
 SELECT count(*)::int
 FROM "LTreeEntities" AS l
-WHERE l."Path" ~ CAST(('*.Astrophysics.' || l."Id"::text) AS lquery)
+WHERE l."Path" ~ CAST('*.Astrophysics.' || l."Id"::text AS lquery)
 """);
     }
 
@@ -211,7 +211,7 @@ WHERE l."Path" @ 'Astro*'
 """
 SELECT l."Id", l."Path", l."PathAsString", l."SomeString"
 FROM "LTreeEntities" AS l
-WHERE (l."Path"::text || '.Astronomy') = 'Top.Science.Astronomy'
+WHERE l."Path"::text || '.Astronomy' = 'Top.Science.Astronomy'
 LIMIT 2
 """);
     }

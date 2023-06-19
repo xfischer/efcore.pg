@@ -9,7 +9,7 @@ public class NodaTimeQueryNpgsqlTest : QueryTestBase<NodaTimeQueryNpgsqlTest.Nod
         : base(fixture)
     {
         Fixture.TestSqlLoggerFactory.Clear();
-        // Fixture.TestSqlLoggerFactory.SetTestOutputHelper(testOutputHelper);
+        Fixture.TestSqlLoggerFactory.SetTestOutputHelper(testOutputHelper);
     }
 
     [ConditionalTheory]
@@ -45,7 +45,7 @@ WHERE n."LocalDate" < DATE '2018-04-21'
 """
 SELECT n."Id", n."DateInterval", n."Duration", n."Instant", n."InstantRange", n."Interval", n."LocalDate", n."LocalDate2", n."LocalDateRange", n."LocalDateTime", n."LocalTime", n."Long", n."OffsetTime", n."Period", n."TimeZoneId", n."ZonedDateTime"
 FROM "NodaTimeTypes" AS n
-WHERE (n."LocalDate" + INTERVAL 'P1M') > n."LocalDate"
+WHERE n."LocalDate" + INTERVAL 'P1M' > n."LocalDate"
 """);
     }
 
@@ -62,7 +62,7 @@ WHERE (n."LocalDate" + INTERVAL 'P1M') > n."LocalDate"
 """
 SELECT n."Id", n."DateInterval", n."Duration", n."Instant", n."InstantRange", n."Interval", n."LocalDate", n."LocalDate2", n."LocalDateRange", n."LocalDateTime", n."LocalTime", n."Long", n."OffsetTime", n."Period", n."TimeZoneId", n."ZonedDateTime"
 FROM "NodaTimeTypes" AS n
-WHERE ((n."Instant" + INTERVAL '1 00:00:00') - n."Instant") = INTERVAL '1 00:00:00'
+WHERE (n."Instant" + INTERVAL '1 00:00:00') - n."Instant" = INTERVAL '1 00:00:00'
 """);
     }
 
@@ -79,7 +79,7 @@ WHERE ((n."Instant" + INTERVAL '1 00:00:00') - n."Instant") = INTERVAL '1 00:00:
 """
 SELECT n."Id", n."DateInterval", n."Duration", n."Instant", n."InstantRange", n."Interval", n."LocalDate", n."LocalDate2", n."LocalDateRange", n."LocalDateTime", n."LocalTime", n."Long", n."OffsetTime", n."Period", n."TimeZoneId", n."ZonedDateTime"
 FROM "NodaTimeTypes" AS n
-WHERE ((n."LocalDateTime" + INTERVAL 'P1D') - n."LocalDateTime") = INTERVAL 'P1D'
+WHERE (n."LocalDateTime" + INTERVAL 'P1D') - n."LocalDateTime" = INTERVAL 'P1D'
 """);
     }
 
@@ -96,7 +96,7 @@ WHERE ((n."LocalDateTime" + INTERVAL 'P1D') - n."LocalDateTime") = INTERVAL 'P1D
 """
 SELECT n."Id", n."DateInterval", n."Duration", n."Instant", n."InstantRange", n."Interval", n."LocalDate", n."LocalDate2", n."LocalDateRange", n."LocalDateTime", n."LocalTime", n."Long", n."OffsetTime", n."Period", n."TimeZoneId", n."ZonedDateTime"
 FROM "NodaTimeTypes" AS n
-WHERE ((n."ZonedDateTime" + INTERVAL '1 00:00:00') - n."ZonedDateTime") = INTERVAL '1 00:00:00'
+WHERE (n."ZonedDateTime" + INTERVAL '1 00:00:00') - n."ZonedDateTime" = INTERVAL '1 00:00:00'
 """);
     }
 
@@ -167,7 +167,7 @@ WHERE make_interval(days => n."LocalDate2" - DATE '2018-04-20') = INTERVAL 'P1D'
 """
 SELECT n."Id", n."DateInterval", n."Duration", n."Instant", n."InstantRange", n."Interval", n."LocalDate", n."LocalDate2", n."LocalDateRange", n."LocalDateTime", n."LocalTime", n."Long", n."OffsetTime", n."Period", n."TimeZoneId", n."ZonedDateTime"
 FROM "NodaTimeTypes" AS n
-WHERE ((n."LocalTime" + INTERVAL 'PT1H') - n."LocalTime") = INTERVAL 'PT1H'
+WHERE (n."LocalTime" + INTERVAL 'PT1H') - n."LocalTime" = INTERVAL 'PT1H'
 """);
     }
 
@@ -348,7 +348,7 @@ END = 5
 
 SELECT n."Id", n."DateInterval", n."Duration", n."Instant", n."InstantRange", n."Interval", n."LocalDate", n."LocalDate2", n."LocalDateRange", n."LocalDateTime", n."LocalTime", n."Long", n."OffsetTime", n."Period", n."TimeZoneId", n."ZonedDateTime"
 FROM "NodaTimeTypes" AS n
-WHERE (n."LocalDateTime" AT TIME ZONE 'Europe/Berlin') = @__ToInstant_0
+WHERE n."LocalDateTime" AT TIME ZONE 'Europe/Berlin' = @__ToInstant_0
 """);
     }
 
@@ -369,7 +369,7 @@ WHERE (n."LocalDateTime" AT TIME ZONE 'Europe/Berlin') = @__ToInstant_0
 
 SELECT n."Id", n."DateInterval", n."Duration", n."Instant", n."InstantRange", n."Interval", n."LocalDate", n."LocalDate2", n."LocalDateRange", n."LocalDateTime", n."LocalTime", n."Long", n."OffsetTime", n."Period", n."TimeZoneId", n."ZonedDateTime"
 FROM "NodaTimeTypes" AS n
-WHERE (n."LocalDateTime" AT TIME ZONE n."TimeZoneId") = @__ToInstant_0
+WHERE n."LocalDateTime" AT TIME ZONE n."TimeZoneId" = @__ToInstant_0
 """);
     }
 
@@ -880,7 +880,7 @@ WHERE floor(date_part('second', make_interval(secs => n."Long"::double precision
     [MemberData(nameof(IsAsyncData))]
     public async Task GroupBy_Property_Select_Sum_over_Period(bool async)
     {
-        using var ctx = CreateContext();
+        await using var ctx = CreateContext();
 
         // Note: Unlike Duration, Period can't be converted to total ticks (because its absolute time varies).
         var query = ctx.Set<NodaTimeTypes>()
@@ -903,7 +903,7 @@ GROUP BY n."Id"
     [MemberData(nameof(IsAsyncData))]
     public async Task GroupBy_Property_Select_Average_over_Period(bool async)
     {
-        using var ctx = CreateContext();
+        await using var ctx = CreateContext();
 
         // Note: Unlike Duration, Period can't be converted to total ticks (because its absolute time varies).
         var query = ctx.Set<NodaTimeTypes>()
@@ -939,7 +939,7 @@ GROUP BY n."Id"
 """
 SELECT n."Id", n."DateInterval", n."Duration", n."Instant", n."InstantRange", n."Interval", n."LocalDate", n."LocalDate2", n."LocalDateRange", n."LocalDateTime", n."LocalTime", n."Long", n."OffsetTime", n."Period", n."TimeZoneId", n."ZonedDateTime"
 FROM "NodaTimeTypes" AS n
-WHERE (date_part('epoch', n."Duration") / 86400.0) > 27.0
+WHERE date_part('epoch', n."Duration") / 86400.0 > 27.0
 """);
     }
 
@@ -956,7 +956,7 @@ WHERE (date_part('epoch', n."Duration") / 86400.0) > 27.0
 """
 SELECT n."Id", n."DateInterval", n."Duration", n."Instant", n."InstantRange", n."Interval", n."LocalDate", n."LocalDate2", n."LocalDateRange", n."LocalDateTime", n."LocalTime", n."Long", n."OffsetTime", n."Period", n."TimeZoneId", n."ZonedDateTime"
 FROM "NodaTimeTypes" AS n
-WHERE (date_part('epoch', n."Duration") / 3600.0) < 700.0
+WHERE date_part('epoch', n."Duration") / 3600.0 < 700.0
 """);
     }
 
@@ -973,7 +973,7 @@ WHERE (date_part('epoch', n."Duration") / 3600.0) < 700.0
 """
 SELECT n."Id", n."DateInterval", n."Duration", n."Instant", n."InstantRange", n."Interval", n."LocalDate", n."LocalDate2", n."LocalDateRange", n."LocalDateTime", n."LocalTime", n."Long", n."OffsetTime", n."Period", n."TimeZoneId", n."ZonedDateTime"
 FROM "NodaTimeTypes" AS n
-WHERE (date_part('epoch', n."Duration") / 60.0) < 40000.0
+WHERE date_part('epoch', n."Duration") / 60.0 < 40000.0
 """);
     }
 
@@ -1007,7 +1007,7 @@ WHERE date_part('epoch', n."Duration") = 2365448.02
 """
 SELECT n."Id", n."DateInterval", n."Duration", n."Instant", n."InstantRange", n."Interval", n."LocalDate", n."LocalDate2", n."LocalDateRange", n."LocalDateTime", n."LocalTime", n."Long", n."OffsetTime", n."Period", n."TimeZoneId", n."ZonedDateTime"
 FROM "NodaTimeTypes" AS n
-WHERE (date_part('epoch', n."Duration") / 0.001) = 2365448020.0
+WHERE date_part('epoch', n."Duration") / 0.001 = 2365448020.0
 """);
     }
 
@@ -1206,7 +1206,7 @@ WHERE NOT (upper_inf(n."Interval"))
 """
 SELECT n."Id", n."DateInterval", n."Duration", n."Instant", n."InstantRange", n."Interval", n."LocalDate", n."LocalDate2", n."LocalDateRange", n."LocalDateTime", n."LocalTime", n."Long", n."OffsetTime", n."Period", n."TimeZoneId", n."ZonedDateTime"
 FROM "NodaTimeTypes" AS n
-WHERE (upper(n."Interval") - lower(n."Interval")) = INTERVAL '5 00:00:00'
+WHERE upper(n."Interval") - lower(n."Interval") = INTERVAL '5 00:00:00'
 """);
     }
 
@@ -1238,7 +1238,7 @@ WHERE @__interval_0 @> n."Instant"
     [MemberData(nameof(IsAsyncData))]
     public async Task Interval_RangeAgg(bool async)
     {
-        using var context = CreateContext();
+        await using var context = CreateContext();
 
         var query = context.NodaTimeTypes
             .GroupBy(x => true)
@@ -1268,7 +1268,7 @@ LIMIT 2
     [MemberData(nameof(IsAsyncData))]
     public async Task Interval_Intersect_aggregate(bool async)
     {
-        using var context = CreateContext();
+        await using var context = CreateContext();
 
         var query = context.NodaTimeTypes
             .GroupBy(x => true)
@@ -1310,7 +1310,7 @@ LIMIT 2
 """
 SELECT n."Id", n."DateInterval", n."Duration", n."Instant", n."InstantRange", n."Interval", n."LocalDate", n."LocalDate2", n."LocalDateRange", n."LocalDateTime", n."LocalTime", n."Long", n."OffsetTime", n."Period", n."TimeZoneId", n."ZonedDateTime"
 FROM "NodaTimeTypes" AS n
-WHERE (upper(n."DateInterval") - lower(n."DateInterval")) = 5
+WHERE upper(n."DateInterval") - lower(n."DateInterval") = 5
 """);
     }
 
@@ -1344,7 +1344,7 @@ WHERE lower(n."DateInterval") = DATE '2018-04-20'
 """
 SELECT n."Id", n."DateInterval", n."Duration", n."Instant", n."InstantRange", n."Interval", n."LocalDate", n."LocalDate2", n."LocalDateRange", n."LocalDateTime", n."LocalTime", n."Long", n."OffsetTime", n."Period", n."TimeZoneId", n."ZonedDateTime"
 FROM "NodaTimeTypes" AS n
-WHERE (upper(n."DateInterval") - INTERVAL 'P1D') = DATE '2018-04-24'
+WHERE upper(n."DateInterval") - INTERVAL 'P1D' = DATE '2018-04-24'
 """);
     }
 
@@ -1437,7 +1437,7 @@ WHERE n."DateInterval" + @__dateInterval_0 = '[2018-04-20,2018-04-26]'::daterang
     [MemberData(nameof(IsAsyncData))]
     public async Task DateInterval_RangeAgg(bool async)
     {
-        using var context = CreateContext();
+        await using var context = CreateContext();
 
         var query = context.NodaTimeTypes
             .GroupBy(x => true)
@@ -1466,7 +1466,7 @@ LIMIT 2
     [MemberData(nameof(IsAsyncData))]
     public async Task DateInterval_Intersect_aggregate(bool async)
     {
-        using var context = CreateContext();
+        await using var context = CreateContext();
 
         var query = context.NodaTimeTypes
             .GroupBy(x => true)
@@ -1540,7 +1540,7 @@ WHERE n."Instant" = @__p_0
 
     [ConditionalTheory]
     [MemberData(nameof(IsAsyncData))]
-    public async Task Instance_InZone_LocalDateTime(bool async)
+    public async Task Instance_InZone_constant_LocalDateTime(bool async)
     {
         await AssertQuery(
             async,
@@ -1552,14 +1552,54 @@ WHERE n."Instant" = @__p_0
 """
 SELECT n."Id", n."DateInterval", n."Duration", n."Instant", n."InstantRange", n."Interval", n."LocalDate", n."LocalDate2", n."LocalDateRange", n."LocalDateTime", n."LocalTime", n."Long", n."OffsetTime", n."Period", n."TimeZoneId", n."ZonedDateTime"
 FROM "NodaTimeTypes" AS n
-WHERE (n."Instant" AT TIME ZONE 'Europe/Berlin') = TIMESTAMP '2018-04-20T12:31:33.666'
+WHERE n."Instant" AT TIME ZONE 'Europe/Berlin' = TIMESTAMP '2018-04-20T12:31:33.666'
+""");
+    }
+
+    [ConditionalTheory]
+    [MemberData(nameof(IsAsyncData))]
+    public async Task Instance_InZone_constant_Date(bool async)
+    {
+        await AssertQuery(
+            async,
+            ss => ss.Set<NodaTimeTypes>().Where(t => t.Instant.InZone(DateTimeZoneProviders.Tzdb["Europe/Berlin"]).Date
+                == new LocalDate(2018, 4, 20)),
+            entryCount: 1);
+
+        AssertSql(
+"""
+SELECT n."Id", n."DateInterval", n."Duration", n."Instant", n."InstantRange", n."Interval", n."LocalDate", n."LocalDate2", n."LocalDateRange", n."LocalDateTime", n."LocalTime", n."Long", n."OffsetTime", n."Period", n."TimeZoneId", n."ZonedDateTime"
+FROM "NodaTimeTypes" AS n
+WHERE CAST(n."Instant" AT TIME ZONE 'Europe/Berlin' AS date) = DATE '2018-04-20'
+""");
+    }
+
+    [ConditionalTheory]
+    [MemberData(nameof(IsAsyncData))]
+    public async Task Instance_InZone_parameter_LocalDateTime(bool async)
+    {
+        var timeZone = DateTimeZoneProviders.Tzdb["Europe/Berlin"];
+
+        await AssertQuery(
+            async,
+            ss => ss.Set<NodaTimeTypes>().Where(t => t.Instant.InZone(timeZone).LocalDateTime
+                == new LocalDateTime(2018, 4, 20, 12, 31, 33, 666)),
+            entryCount: 1);
+
+        AssertSql(
+"""
+@__timeZone_0='Europe/Berlin'
+
+SELECT n."Id", n."DateInterval", n."Duration", n."Instant", n."InstantRange", n."Interval", n."LocalDate", n."LocalDate2", n."LocalDateRange", n."LocalDateTime", n."LocalTime", n."Long", n."OffsetTime", n."Period", n."TimeZoneId", n."ZonedDateTime"
+FROM "NodaTimeTypes" AS n
+WHERE n."Instant" AT TIME ZONE @__timeZone_0 = TIMESTAMP '2018-04-20T12:31:33.666'
 """);
     }
 
     [ConditionalFact]
     public async Task Instance_InZone_without_LocalDateTime_fails()
     {
-        using var ctx = CreateContext();
+        await using var ctx = CreateContext();
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => ctx.Set<NodaTimeTypes>().Where(t => t.Instant.InZone(DateTimeZoneProviders.Tzdb["Europe/Berlin"]) == default)
@@ -1755,7 +1795,7 @@ WHERE floor(date_part('second', n."ZonedDateTime" AT TIME ZONE 'UTC'))::int = 33
 """
 SELECT n."Id", n."DateInterval", n."Duration", n."Instant", n."InstantRange", n."Interval", n."LocalDate", n."LocalDate2", n."LocalDateRange", n."LocalDateTime", n."LocalTime", n."Long", n."OffsetTime", n."Period", n."TimeZoneId", n."ZonedDateTime"
 FROM "NodaTimeTypes" AS n
-WHERE CAST((n."ZonedDateTime" AT TIME ZONE 'UTC') AS date) = DATE '2018-04-20'
+WHERE CAST(n."ZonedDateTime" AT TIME ZONE 'UTC' AS date) = DATE '2018-04-20'
 """);
     }
 
@@ -1792,7 +1832,7 @@ END = 5
 """
 SELECT n."Id", n."DateInterval", n."Duration", n."Instant", n."InstantRange", n."Interval", n."LocalDate", n."LocalDate2", n."LocalDateRange", n."LocalDateTime", n."LocalTime", n."Long", n."OffsetTime", n."Period", n."TimeZoneId", n."ZonedDateTime"
 FROM "NodaTimeTypes" AS n
-WHERE (n."Instant" AT TIME ZONE 'UTC') = TIMESTAMP '2018-04-20T10:31:33.666'
+WHERE n."Instant" AT TIME ZONE 'UTC' = TIMESTAMP '2018-04-20T10:31:33.666'
 """);
     }
 
@@ -1844,7 +1884,7 @@ LIMIT 1
     private NodaTimeContext CreateContext()
         => Fixture.CreateContext();
 
-    private static Period _defaultPeriod = Period.FromYears(2018) + Period.FromMonths(4) + Period.FromDays(20) +
+    private static readonly Period _defaultPeriod = Period.FromYears(2018) + Period.FromMonths(4) + Period.FromDays(20) +
         Period.FromHours(10) + Period.FromMinutes(31) + Period.FromSeconds(23) +
         Period.FromMilliseconds(666);
 
@@ -1972,9 +2012,9 @@ LIMIT 1
             }.ToDictionary(e => e.Key, e => (object)e.Value);
     }
 
-    protected class NodaTimeData : ISetSource
+    private class NodaTimeData : ISetSource
     {
-        public IReadOnlyList<NodaTimeTypes> NodaTimeTypes { get; }
+        private IReadOnlyList<NodaTimeTypes> NodaTimeTypes { get; }
 
         public NodaTimeData()
             => NodaTimeTypes = CreateNodaTimeTypes();

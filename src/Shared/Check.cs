@@ -72,8 +72,7 @@ internal static class Check
         IReadOnlyCollection<T>? value,
         [InvokerParameterName] string parameterName)
     {
-        if (!ReferenceEquals(value, null)
-            && (value.Count == 0))
+        if (value is { Count: 0 })
         {
             NotEmpty(parameterName, nameof(parameterName));
 
@@ -123,4 +122,9 @@ internal static class Check
             throw new Exception($"Check.DebugAssert failed: {message}");
         }
     }
+
+    [Conditional("DEBUG")]
+    [DoesNotReturn]
+    public static void DebugFail(string message)
+        => throw new Exception($"Check.DebugFail failed: {message}");
 }

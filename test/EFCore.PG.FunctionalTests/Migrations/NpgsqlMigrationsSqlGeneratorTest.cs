@@ -88,7 +88,7 @@ ALTER TABLE "People" ADD "Alias" text NOT NULL;
 
         AssertSql(
 """
-ALTER TABLE "Person" ADD "Name" text NULL;
+ALTER TABLE "Person" ADD "Name" text;
 
 """);
     }
@@ -99,7 +99,7 @@ ALTER TABLE "Person" ADD "Name" text NULL;
 
         AssertSql(
 """
-ALTER TABLE "Person" ADD "Name" text NULL;
+ALTER TABLE "Person" ADD "Name" text;
 
 """);
     }
@@ -110,7 +110,7 @@ ALTER TABLE "Person" ADD "Name" text NULL;
 
         AssertSql(
 """
-ALTER TABLE "Person" ADD "Name" character(100) NULL;
+ALTER TABLE "Person" ADD "Name" character(100);
 
 """);
     }
@@ -121,7 +121,7 @@ ALTER TABLE "Person" ADD "Name" character(100) NULL;
 
         AssertSql(
 """
-ALTER TABLE "Person" ADD "Name" character varying(32) NULL;
+ALTER TABLE "Person" ADD "Name" character varying(32);
 
 """);
     }
@@ -132,7 +132,7 @@ ALTER TABLE "Person" ADD "Name" character varying(32) NULL;
 
         AssertSql(
 """
-ALTER TABLE "Person" ADD "Name" character varying(30) NULL;
+ALTER TABLE "Person" ADD "Name" character varying(30);
 
 """);
     }
@@ -466,6 +466,19 @@ WHERE "First Name" = 'Daenerys';
     public override void DefaultValue_with_line_breaks_2(bool isUnicode)
     {
         // https://github.com/npgsql/efcore.pg/issues/1478
+    }
+
+    public override void Sequence_restart_operation(long? startsAt)
+    {
+        base.Sequence_restart_operation(startsAt);
+
+        AssertSql(
+            startsAt.HasValue
+                ? $"""
+ALTER SEQUENCE dbo."TestRestartSequenceOperation" START WITH {startsAt};
+ALTER SEQUENCE dbo."TestRestartSequenceOperation" RESTART;
+"""
+                : """ALTER SEQUENCE dbo."TestRestartSequenceOperation" RESTART;""");
     }
 
     // Which index collations are available on a given PostgreSQL varies (e.g. Linux vs. Windows)

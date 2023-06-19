@@ -135,10 +135,7 @@ public class NpgsqlNodaTimeMemberTranslator : IMemberTranslator
 
         if (declaringType == typeof(ZonedDateTime))
         {
-            // date_part, which is used to extract most components, doesn't have an overload for timestamptz, so passing one directly
-            // converts it to the local timezone as per TimeZone. Explicitly convert it to a local timestamp in UTC.
-            return TranslateDateTime(_sqlExpressionFactory.AtUtc(instance), member, returnType)
-                ?? TranslateZonedDateTime(instance, member);
+            return TranslateZonedDateTime(instance, member, returnType);
         }
 
         if (declaringType == typeof(Duration))
@@ -339,7 +336,7 @@ public class NpgsqlNodaTimeMemberTranslator : IMemberTranslator
             // PG allows converting a timestamp directly to date, truncating the time; but given a timestamptz, it performs a time zone
             // conversion (based on TimeZone), which we don't want (so avoid translating except on timestamp).
             // The translation for ZonedDateTime.Date converts to timestamp before ending up here.
-            case "Date" when instance.TypeMapping is TimestampLocalDateTimeMapping:
+            case "Date" when instance.TypeMapping is TimestampLocalDateTimeMapping or LegacyTimestampInstantMapping:
                 return _sqlExpressionFactory.Convert(instance, typeof(LocalDate), _typeMappingSource.FindMapping(typeof(LocalDate))!);
 
             case "TimeOfDay":
@@ -401,22 +398,28 @@ public class NpgsqlNodaTimeMemberTranslator : IMemberTranslator
         return result;
     }
 
-    private SqlExpression? TranslateZonedDateTime(SqlExpression instance, MemberInfo member)
+    private SqlExpression? TranslateZonedDateTime(SqlExpression instance, MemberInfo member, Type returnType)
     {
-        if (member == ZonedDateTime_LocalDateTime)
+        if (instance is PendingZonedDateTimeExpression pendingZonedDateTime)
         {
-            if (instance is PendingZonedDateTimeExpression pendingZonedDateTime)
-            {
-                return _sqlExpressionFactory.AtTimeZone(
-                    pendingZonedDateTime.Operand,
-                    pendingZonedDateTime.TimeZoneId,
-                    typeof(LocalDateTime),
-                    _localDateTimeTypeMapping);
-            }
+            instance = _sqlExpressionFactory.AtTimeZone(
+                pendingZonedDateTime.Operand,
+                pendingZonedDateTime.TimeZoneId,
+                typeof(LocalDateTime),
+                _localDateTimeTypeMapping);
 
-            return _sqlExpressionFactory.AtUtc(instance);
+            return member == ZonedDateTime_LocalDateTime
+                ? instance
+                : TranslateDateTime(instance, member, returnType);
         }
 
-        return null;
+        // date_part, which is used to extract most components, doesn't have an overload for timestamptz, so passing one directly
+        // converts it to the local timezone as per TimeZone. Explicitly convert it to a 'timestamp without time zone' in UTC.
+        // The same works also for the LocalDateTime member.
+        instance = _sqlExpressionFactory.AtUtc(instance);
+
+        return member == ZonedDateTime_LocalDateTime
+            ? instance
+            : TranslateDateTime(instance, member, returnType);
     }
 }

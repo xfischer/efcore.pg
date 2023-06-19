@@ -57,6 +57,9 @@ public class NpgsqlNodaTimeTypeMappingSourcePlugin : IRelationalTypeMappingSourc
     private readonly PeriodIntervalMapping _periodInterval = new();
     private readonly DurationIntervalMapping _durationInterval = new();
 
+    // PostgreSQL has no native type for representing time zones - it just uses the IANA ID as text.
+    private readonly DateTimeZoneMapping _timeZone = new("text");
+
     // Built-in ranges
     private readonly NpgsqlRangeTypeMapping _timestampLocalDateTimeRange;
     private readonly NpgsqlRangeTypeMapping _legacyTimestampInstantRange;
@@ -199,6 +202,7 @@ public class NpgsqlNodaTimeTypeMappingSourcePlugin : IRelationalTypeMappingSourc
             { typeof(OffsetTime), _timetz },
             { typeof(Period), _periodInterval },
             { typeof(Duration), _durationInterval },
+            // See DateTimeZone below
 
             { typeof(NpgsqlRange<Instant>), LegacyTimestampBehavior ? _legacyTimestampInstantRange : _timestamptzInstantRange },
             { typeof(NpgsqlRange<LocalDateTime>), _timestampLocalDateTimeRange },
@@ -290,9 +294,20 @@ public class NpgsqlNodaTimeTypeMappingSourcePlugin : IRelationalTypeMappingSourc
             }
         }
 
-        return clrType is not null && ClrTypeMappings.TryGetValue(clrType, out var mapping)
-            ? mapping
-            : null;
+        if (clrType is not null)
+        {
+            if (ClrTypeMappings.TryGetValue(clrType, out var mapping))
+            {
+                return mapping;
+            }
+
+            if (clrType.IsAssignableTo(typeof(DateTimeZone)))
+            {
+                return _timeZone;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -350,14 +365,15 @@ public class NpgsqlNodaTimeTypeMappingSourcePlugin : IRelationalTypeMappingSourc
 
             // If no mapping was found for the element, there's no mapping for the array.
             // Also, arrays of arrays aren't supported (as opposed to multidimensional arrays) by PostgreSQL
-            if (elementMapping is null || elementMapping is NpgsqlArrayTypeMapping)
+            if (elementMapping is null or NpgsqlArrayTypeMapping)
             {
                 return null;
             }
 
-            return new NpgsqlArrayArrayTypeMapping(storeType, elementMapping);
+            return new NpgsqlArrayTypeMapping(storeType, clrType ?? elementMapping.ClrType.MakeArrayType(), elementMapping);
         }
 
+        // TODO: Clean this up, should not be needed
         if (clrType is null)
         {
             return null;
@@ -382,7 +398,7 @@ public class NpgsqlNodaTimeTypeMappingSourcePlugin : IRelationalTypeMappingSourc
                 return null;
             }
 
-            return new NpgsqlArrayArrayTypeMapping(clrType, elementMapping);
+            return new NpgsqlArrayTypeMapping(clrType, elementMapping);
         }
 
         if (clrType.IsGenericList())
@@ -402,7 +418,7 @@ public class NpgsqlNodaTimeTypeMappingSourcePlugin : IRelationalTypeMappingSourc
                 return null;
             }
 
-            return new NpgsqlArrayListTypeMapping(clrType, elementMapping);
+            return new NpgsqlArrayTypeMapping(clrType, elementMapping);
         }
 
         return null;

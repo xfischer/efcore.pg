@@ -7,6 +7,7 @@ public class ArrayListQueryTest : ArrayQueryTest<ArrayListQueryTest.ArrayListQue
     public ArrayListQueryTest(ArrayListQueryFixture fixture, ITestOutputHelper testOutputHelper)
         : base(fixture, testOutputHelper)
     {
+        Fixture.TestSqlLoggerFactory.SetTestOutputHelper(testOutputHelper);
     }
 
     #region Indexers
@@ -281,9 +282,8 @@ WHERE s."NullableText" IN ('foo', 'xxx')
 
 SELECT s."Id", s."ArrayContainerEntityId", s."Byte", s."ByteArray", s."Bytea", s."EnumConvertedToInt", s."EnumConvertedToString", s."IntArray", s."IntList", s."NonNullableText", s."NullableEnumConvertedToString", s."NullableEnumConvertedToStringWithNonNullableLambda", s."NullableIntArray", s."NullableIntList", s."NullableStringArray", s."NullableStringList", s."NullableText", s."StringArray", s."StringList", s."ValueConvertedArray", s."ValueConvertedList", s."Varchar10", s."Varchar15"
 FROM "SomeEntities" AS s
-WHERE s."NullableText" = ANY (@__array_0) OR ((s."NullableText" IS NULL) AND (array_position(@__array_0, NULL) IS NOT NULL))
+WHERE s."NullableText" = ANY (@__array_0) OR (s."NullableText" IS NULL AND array_position(@__array_0, NULL) IS NOT NULL)
 """);
-
     }
 
     public override async Task Array_param_Contains_non_nullable_column(bool async)
@@ -347,7 +347,7 @@ WHERE s."NonNullableText" = ANY (@__array_0)
 
 SELECT count(*)::int
 FROM "SomeEntities" AS s
-WHERE NOT (s."NonNullableText" = ANY (@__array_0) AND (s."NonNullableText" = ANY (@__array_0) IS NOT NULL))
+WHERE NOT (s."NonNullableText" = ANY (@__array_0) AND s."NonNullableText" = ANY (@__array_0) IS NOT NULL)
 """);
     }
 
@@ -370,7 +370,7 @@ WHERE NOT (s."NonNullableText" = ANY (@__array_0) AND (s."NonNullableText" = ANY
 
 SELECT count(*)::int
 FROM "SomeEntities" AS s
-WHERE s."NullableText" = ANY (@__array_0) OR ((s."NullableText" IS NULL) AND (array_position(@__array_0, NULL) IS NOT NULL))
+WHERE s."NullableText" = ANY (@__array_0) OR (s."NullableText" IS NULL AND array_position(@__array_0, NULL) IS NOT NULL)
 """);
     }
 
@@ -393,7 +393,7 @@ WHERE s."NullableText" = ANY (@__array_0) OR ((s."NullableText" IS NULL) AND (ar
 
 SELECT count(*)::int
 FROM "SomeEntities" AS s
-WHERE NOT (s."NullableText" = ANY (@__array_0) AND (s."NullableText" = ANY (@__array_0) IS NOT NULL)) AND ((s."NullableText" IS NOT NULL) OR (array_position(@__array_0, NULL) IS NULL))
+WHERE NOT (s."NullableText" = ANY (@__array_0) AND s."NullableText" = ANY (@__array_0) IS NOT NULL) AND (s."NullableText" IS NOT NULL OR array_position(@__array_0, NULL) IS NULL)
 """);
     }
 
@@ -488,7 +488,7 @@ WHERE s."EnumConvertedToString" = ANY (@__array_0)
 
 SELECT s."Id", s."ArrayContainerEntityId", s."Byte", s."ByteArray", s."Bytea", s."EnumConvertedToInt", s."EnumConvertedToString", s."IntArray", s."IntList", s."NonNullableText", s."NullableEnumConvertedToString", s."NullableEnumConvertedToStringWithNonNullableLambda", s."NullableIntArray", s."NullableIntList", s."NullableStringArray", s."NullableStringList", s."NullableText", s."StringArray", s."StringList", s."ValueConvertedArray", s."ValueConvertedList", s."Varchar10", s."Varchar15"
 FROM "SomeEntities" AS s
-WHERE s."NullableEnumConvertedToString" = ANY (@__array_0) OR ((s."NullableEnumConvertedToString" IS NULL) AND (array_position(@__array_0, NULL) IS NOT NULL))
+WHERE s."NullableEnumConvertedToString" = ANY (@__array_0) OR (s."NullableEnumConvertedToString" IS NULL AND array_position(@__array_0, NULL) IS NOT NULL)
 """);
     }
 
@@ -507,7 +507,7 @@ WHERE s."NullableEnumConvertedToString" = ANY (@__array_0) OR ((s."NullableEnumC
 
 SELECT s."Id", s."ArrayContainerEntityId", s."Byte", s."ByteArray", s."Bytea", s."EnumConvertedToInt", s."EnumConvertedToString", s."IntArray", s."IntList", s."NonNullableText", s."NullableEnumConvertedToString", s."NullableEnumConvertedToStringWithNonNullableLambda", s."NullableIntArray", s."NullableIntList", s."NullableStringArray", s."NullableStringList", s."NullableText", s."StringArray", s."StringList", s."ValueConvertedArray", s."ValueConvertedList", s."Varchar10", s."Varchar15"
 FROM "SomeEntities" AS s
-WHERE s."NullableEnumConvertedToStringWithNonNullableLambda" = ANY (@__array_0) OR ((s."NullableEnumConvertedToStringWithNonNullableLambda" IS NULL) AND (array_position(@__array_0, NULL) IS NOT NULL))
+WHERE s."NullableEnumConvertedToStringWithNonNullableLambda" = ANY (@__array_0) OR (s."NullableEnumConvertedToStringWithNonNullableLambda" IS NULL AND array_position(@__array_0, NULL) IS NOT NULL)
 """);
     }
 
@@ -820,14 +820,17 @@ WHERE ARRAY[5,6]::integer[] <@ s."IntList"
 
     public override async Task Append(bool async)
     {
-        await base.Append(async);
+        // TODO: https://github.com/dotnet/efcore/issues/30669
+        await AssertTranslationFailed(() => base.Append(async));
 
-        AssertSql(
-"""
-SELECT s."Id", s."ArrayContainerEntityId", s."Byte", s."ByteArray", s."Bytea", s."EnumConvertedToInt", s."EnumConvertedToString", s."IntArray", s."IntList", s."NonNullableText", s."NullableEnumConvertedToString", s."NullableEnumConvertedToStringWithNonNullableLambda", s."NullableIntArray", s."NullableIntList", s."NullableStringArray", s."NullableStringList", s."NullableText", s."StringArray", s."StringList", s."ValueConvertedArray", s."ValueConvertedList", s."Varchar10", s."Varchar15"
-FROM "SomeEntities" AS s
-WHERE array_append(s."IntList", 5) = ARRAY[3,4,5]::integer[]
-""");
+//         await base.Append(async);
+//
+//         AssertSql(
+// """
+// SELECT s."Id", s."ArrayContainerEntityId", s."Byte", s."ByteArray", s."Bytea", s."EnumConvertedToInt", s."EnumConvertedToString", s."IntArray", s."IntList", s."NonNullableText", s."NullableEnumConvertedToString", s."NullableEnumConvertedToStringWithNonNullableLambda", s."NullableIntArray", s."NullableIntList", s."NullableStringArray", s."NullableStringList", s."NullableText", s."StringArray", s."StringList", s."ValueConvertedArray", s."ValueConvertedList", s."Varchar10", s."Varchar15"
+// FROM "SomeEntities" AS s
+// WHERE array_append(s."IntList", 5) = ARRAY[3,4,5]::integer[]
+// """);
     }
 
     public override async Task Concat(bool async)

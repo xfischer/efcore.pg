@@ -28,9 +28,13 @@ public class NpgsqlMethodCallTranslatorProvider : RelationalMethodCallTranslator
     public NpgsqlMethodCallTranslatorProvider(
         RelationalMethodCallTranslatorProviderDependencies dependencies,
         IModel model,
-        INpgsqlSingletonOptions npgsqlSingletonOptions)
+        IDbContextOptions contextOptions)
         : base(dependencies)
     {
+        var npgsqlOptions = contextOptions.FindExtension<NpgsqlOptionsExtension>() ?? new();
+        var supportsMultiranges = !npgsqlOptions.IsPostgresVersionSet
+            || npgsqlOptions.IsPostgresVersionSet && npgsqlOptions.PostgresVersion.AtLeast(14);
+
         var sqlExpressionFactory = (NpgsqlSqlExpressionFactory)dependencies.SqlExpressionFactory;
         var typeMappingSource = (NpgsqlTypeMappingSource)dependencies.RelationalTypeMappingSource;
         var jsonTranslator = new NpgsqlJsonPocoTranslator(typeMappingSource, sqlExpressionFactory, model);
@@ -38,7 +42,7 @@ public class NpgsqlMethodCallTranslatorProvider : RelationalMethodCallTranslator
 
         AddTranslators(new IMethodCallTranslator[]
         {
-            new NpgsqlArrayTranslator(sqlExpressionFactory, jsonTranslator, npgsqlSingletonOptions.UseRedshift),
+            new NpgsqlArrayMethodTranslator(sqlExpressionFactory, jsonTranslator),
             new NpgsqlByteArrayMethodTranslator(sqlExpressionFactory),
             new NpgsqlConvertTranslator(sqlExpressionFactory),
             new NpgsqlDateTimeMethodTranslator(typeMappingSource, sqlExpressionFactory),
@@ -46,14 +50,15 @@ public class NpgsqlMethodCallTranslatorProvider : RelationalMethodCallTranslator
             new NpgsqlFuzzyStringMatchMethodTranslator(sqlExpressionFactory),
             new NpgsqlJsonDomTranslator(typeMappingSource, sqlExpressionFactory, model),
             new NpgsqlJsonDbFunctionsTranslator(typeMappingSource, sqlExpressionFactory, model),
+            new NpgsqlJsonPocoTranslator(typeMappingSource, sqlExpressionFactory, model),
             new NpgsqlLikeTranslator(sqlExpressionFactory),
             LTreeTranslator,
             new NpgsqlMathTranslator(typeMappingSource, sqlExpressionFactory, model),
             new NpgsqlNetworkTranslator(typeMappingSource, sqlExpressionFactory, model),
-            new NpgsqlNewGuidTranslator(sqlExpressionFactory, npgsqlSingletonOptions),
+            new NpgsqlNewGuidTranslator(sqlExpressionFactory, npgsqlOptions.PostgresVersion),
             new NpgsqlObjectToStringTranslator(typeMappingSource, sqlExpressionFactory),
             new NpgsqlRandomTranslator(sqlExpressionFactory),
-            new NpgsqlRangeTranslator(typeMappingSource, sqlExpressionFactory, model, npgsqlSingletonOptions),
+            new NpgsqlRangeTranslator(typeMappingSource, sqlExpressionFactory, model, supportsMultiranges),
             new NpgsqlRegexIsMatchTranslator(sqlExpressionFactory),
             new NpgsqlRowValueTranslator(sqlExpressionFactory),
             new NpgsqlStringMethodTranslator(typeMappingSource, sqlExpressionFactory, model),

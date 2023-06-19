@@ -290,7 +290,7 @@ LIMIT 2
 """);
     }
 
-    [Fact]
+    [Fact(Skip = "https://github.com/dotnet/efcore/issues/30386")]
     public void Array_of_objects()
     {
         using var ctx = CreateContext();
@@ -468,7 +468,7 @@ LIMIT 2
 """
 SELECT j."Id", j."Customer", j."ToplevelArray"
 FROM "JsonbEntities" AS j
-WHERE (j."Customer"->>'Name' IS NOT NULL) AND (j."Customer"->>'Name' LIKE 'J%')
+WHERE j."Customer"->>'Name' IS NOT NULL AND j."Customer"->>'Name' LIKE 'J%'
 LIMIT 2
 """);
     }

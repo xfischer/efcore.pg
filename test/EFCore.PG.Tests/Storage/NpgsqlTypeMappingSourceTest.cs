@@ -13,6 +13,7 @@ public class NpgsqlTypeMappingSourceTest
     [InlineData("integer[]", typeof(int[]), null, false)]
     [InlineData("int", typeof(int), null, false)]
     [InlineData("int[]", typeof(int[]), null, false)]
+    [InlineData("numeric", typeof(decimal), null, false)]
     [InlineData("text", typeof(string), null, false)]
     [InlineData("TEXT", typeof(string), null, false)]
     [InlineData("character(8)", typeof(string), 8, true)]
@@ -62,12 +63,12 @@ public class NpgsqlTypeMappingSourceTest
     {
         var mapping = CreateTypeMappingSource().FindMapping("varchar(32)[]");
 
-        var arrayMapping = Assert.IsType<NpgsqlArrayArrayTypeMapping>(mapping);
+        var arrayMapping = Assert.IsType<NpgsqlArrayTypeMapping>(mapping);
         Assert.Same(typeof(string[]), arrayMapping.ClrType);
         Assert.Equal("varchar(32)[]", arrayMapping.StoreType);
         Assert.Null(arrayMapping.Size);
 
-        var elementMapping = arrayMapping.ElementMapping;
+        var elementMapping = arrayMapping.ElementTypeMapping;
         Assert.Same(typeof(string), elementMapping.ClrType);
         Assert.Equal("varchar(32)", elementMapping.StoreType);
         Assert.Equal(32, elementMapping.Size);
@@ -85,11 +86,11 @@ public class NpgsqlTypeMappingSourceTest
     [Fact]
     public void Timestamp_without_time_zone_Array_5()
     {
-        var arrayMapping = Assert.IsType<NpgsqlArrayArrayTypeMapping>(CreateTypeMappingSource().FindMapping("timestamp(5) without time zone[]"));
+        var arrayMapping = Assert.IsType<NpgsqlArrayTypeMapping>(CreateTypeMappingSource().FindMapping("timestamp(5) without time zone[]"));
         Assert.Same(typeof(DateTime[]), arrayMapping.ClrType);
         Assert.Equal("timestamp(5) without time zone[]", arrayMapping.StoreType);
 
-        var elementMapping = arrayMapping.ElementMapping;
+        var elementMapping = arrayMapping.ElementTypeMapping;
         Assert.Same(typeof(DateTime), elementMapping.ClrType);
         Assert.Equal("timestamp(5) without time zone", elementMapping.StoreType);
     }
@@ -131,6 +132,8 @@ public class NpgsqlTypeMappingSourceTest
 
     [Theory]
     [InlineData("integer", typeof(int))]
+    [InlineData("numeric", typeof(float))]
+    [InlineData("numeric", typeof(double))]
     [InlineData("integer[]", typeof(int[]))]
     [InlineData("integer[]", typeof(List<int>))]
     [InlineData("smallint[]", typeof(byte[]))]
@@ -207,7 +210,7 @@ public class NpgsqlTypeMappingSourceTest
         Assert.Equal("ltree[]", arrayMapping.StoreType);
         Assert.Same(expectedType, arrayMapping.ClrType);
 
-        var elementMapping = arrayMapping.ElementMapping;
+        var elementMapping = arrayMapping.ElementTypeMapping;
         Assert.NotNull(elementMapping);
         Assert.Equal("ltree", elementMapping.StoreType);
         Assert.Same(typeof(LTree), elementMapping.ClrType);
@@ -215,9 +218,9 @@ public class NpgsqlTypeMappingSourceTest
         var arrayConverter = arrayMapping.Converter;
         Assert.NotNull(arrayConverter);
         Assert.Same(expectedType, arrayConverter.ModelClrType);
-        Assert.Same(typeof(string[]), arrayConverter.ProviderClrType);
+        Assert.Same(expectedType.IsArray ? typeof(string[]) : typeof(List<string>), arrayConverter.ProviderClrType);
 
-        Assert.Collection((string[])arrayConverter.ConvertToProvider(
+        Assert.Collection((ICollection<string>)arrayConverter.ConvertToProvider(
                 expectedType.IsArray
                     ? new LTree[] { new("foo"), new("bar") }
                     : new List<LTree> { new("foo"), new("bar") }),
@@ -299,7 +302,7 @@ public class NpgsqlTypeMappingSourceTest
                     ? _dummyMapping
                     : null;
 
-        private DummyMapping _dummyMapping = new();
+        private readonly DummyMapping _dummyMapping = new();
 
         private class DummyMapping : RelationalTypeMapping
         {

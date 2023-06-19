@@ -1,4 +1,3 @@
-using Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure.Internal;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Query.Expressions;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.Mapping;
 using static Npgsql.EntityFrameworkCore.PostgreSQL.Utilities.Statics;
@@ -33,13 +32,12 @@ public class NpgsqlRangeTranslator : IMethodCallTranslator, IMemberTranslator
         IRelationalTypeMappingSource typeMappingSource,
         NpgsqlSqlExpressionFactory npgsqlSqlExpressionFactory,
         IModel model,
-        INpgsqlSingletonOptions npgsqlSingletonOptions)
+        bool supportsMultiranges)
     {
         _typeMappingSource = typeMappingSource;
         _sqlExpressionFactory = npgsqlSqlExpressionFactory;
         _model = model;
-        _supportsMultiranges = npgsqlSingletonOptions.PostgresVersionWithoutDefault is null
-            || npgsqlSingletonOptions.PostgresVersionWithoutDefault.AtLeast(14);
+        _supportsMultiranges = supportsMultiranges;
     }
 
     /// <inheritdoc />
@@ -146,7 +144,7 @@ public class NpgsqlRangeTranslator : IMethodCallTranslator, IMemberTranslator
             return null;
         }
 
-        if (member.Name == nameof(NpgsqlRange<int>.LowerBound) || member.Name == nameof(NpgsqlRange<int>.UpperBound))
+        if (member.Name is nameof(NpgsqlRange<int>.LowerBound) or nameof(NpgsqlRange<int>.UpperBound))
         {
             var typeMapping = instance!.TypeMapping is NpgsqlRangeTypeMapping rangeMapping
                 ? rangeMapping.SubtypeMapping

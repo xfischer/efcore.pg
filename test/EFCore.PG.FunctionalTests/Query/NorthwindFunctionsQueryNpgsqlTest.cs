@@ -24,7 +24,7 @@ public class NorthwindFunctionsQueryNpgsqlTest : NorthwindFunctionsQueryRelation
 """
 SELECT c."CustomerID", c."Address", c."City", c."CompanyName", c."ContactName", c."ContactTitle", c."Country", c."Fax", c."Phone", c."PostalCode", c."Region"
 FROM "Customers" AS c
-WHERE (c."Region" IS NULL) OR btrim(c."Region", E' \t\n\r') = ''
+WHERE c."Region" IS NULL OR btrim(c."Region", E' \t\n\r') = ''
 """);
     }
 
@@ -62,7 +62,7 @@ WHERE (c."Region" IS NULL) OR btrim(c."Region", E' \t\n\r') = ''
 
 SELECT c."CustomerID", c."Address", c."City", c."CompanyName", c."ContactName", c."ContactTitle", c."Country", c."Fax", c."Phone", c."PostalCode", c."Region"
 FROM "Customers" AS c
-WHERE concat_ws('|', c."CustomerID", COALESCE(c."CompanyName", ''), COALESCE(@__param_0, ''), COALESCE(NULL, ''), 'constant', '') = 'ALFKI|Alfreds Futterkiste|param||constant|'
+WHERE concat_ws('|', c."CustomerID", c."CompanyName", COALESCE(@__param_0, ''), COALESCE(NULL, ''), 'constant', '') = 'ALFKI|Alfreds Futterkiste|param||constant|'
 """);
     }
 
@@ -437,7 +437,7 @@ GROUP BY c."City"
     [MemberData(nameof(IsAsyncData))]
     public virtual async Task GroupBy_ArrayAgg(bool async)
     {
-        using var ctx = CreateContext();
+        await using var ctx = CreateContext();
 
         var query = ctx.Set<Customer>()
             .GroupBy(c => c.City)
@@ -473,7 +473,7 @@ GROUP BY c."City"
     [MemberData(nameof(IsAsyncData))]
     public virtual async Task GroupBy_JsonAgg(bool async)
     {
-        using var ctx = CreateContext();
+        await using var ctx = CreateContext();
 
         var query = ctx.Set<Customer>()
             .GroupBy(c => c.City)
@@ -509,7 +509,7 @@ GROUP BY c."City"
     [MemberData(nameof(IsAsyncData))]
     public virtual async Task GroupBy_JsonbAgg(bool async)
     {
-        using var ctx = CreateContext();
+        await using var ctx = CreateContext();
 
         var query = ctx.Set<Customer>()
             .GroupBy(c => c.City)
@@ -549,7 +549,7 @@ GROUP BY c."City"
     [MemberData(nameof(IsAsyncData))]
     public virtual async Task GroupBy_JsonObjectAgg(bool async)
     {
-        using var ctx = CreateContext();
+        await using var ctx = CreateContext();
 
         var query = ctx.Set<Customer>()
             .GroupBy(c => c.City)
@@ -585,7 +585,7 @@ GROUP BY c."City"
     [MemberData(nameof(IsAsyncData))]
     public virtual async Task GroupBy_JsonObjectAgg_as_Dictionary(bool async)
     {
-        using var ctx = CreateContext();
+        await using var ctx = CreateContext();
 
         var query = ctx.Set<Customer>()
             .GroupBy(c => c.City)
@@ -627,7 +627,7 @@ GROUP BY c."City"
     [MemberData(nameof(IsAsyncData))]
     public virtual async Task GroupBy_JsonbObjectAgg(bool async)
     {
-        using var ctx = CreateContext();
+        await using var ctx = CreateContext();
 
         // Note that unlike with json, jsonb doesn't guarantee ordering; so we parse the JSON string client-side.
         var query = ctx.Set<Customer>()
@@ -670,7 +670,7 @@ GROUP BY c."City"
     [MemberData(nameof(IsAsyncData))]
     public virtual async Task GroupBy_JsonbObjectAgg_as_Dictionary(bool async)
     {
-        using var ctx = CreateContext();
+        await using var ctx = CreateContext();
 
         var query = ctx.Set<Customer>()
             .GroupBy(c => c.City)

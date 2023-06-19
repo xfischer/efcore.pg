@@ -41,6 +41,17 @@ DELETE FROM "Owner" AS o
         AssertSql();
     }
 
+    public override async Task Update_non_owned_property_on_entity_with_owned(bool async)
+    {
+        await base.Update_non_owned_property_on_entity_with_owned(async);
+
+        AssertSql(
+"""
+UPDATE "Owner" AS o
+SET "Title" = 'SomeValue'
+""");
+    }
+
     public override async Task Delete_predicate_based_on_optional_navigation(bool async)
     {
         await base.Delete_predicate_based_on_optional_navigation(async);
@@ -52,9 +63,23 @@ WHERE EXISTS (
     SELECT 1
     FROM "Posts" AS p0
     LEFT JOIN "Blogs" AS b ON p0."BlogId" = b."Id"
-    WHERE (b."Title" IS NOT NULL) AND (b."Title" LIKE 'Arthur%') AND p0."Id" = p."Id")
+    WHERE b."Title" IS NOT NULL AND b."Title" LIKE 'Arthur%' AND p0."Id" = p."Id")
 """);
     }
+
+    public override async Task Update_non_owned_property_on_entity_with_owned2(bool async)
+    {
+        await base.Update_non_owned_property_on_entity_with_owned2(async);
+
+        AssertSql(
+"""
+UPDATE "Owner" AS o
+SET "Title" = COALESCE(o."Title", '') || '_Suffix'
+""");
+    }
+
+    public override Task Delete_entity_with_auto_include(bool async)
+        => Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => base.Delete_entity_with_auto_include(async)); // #30577
 
     private void AssertSql(params string[] expected)
         => TestSqlLoggerFactory.AssertBaseline(expected);

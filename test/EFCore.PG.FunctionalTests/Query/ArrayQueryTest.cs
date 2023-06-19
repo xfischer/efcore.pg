@@ -13,7 +13,7 @@ public abstract class ArrayQueryTest<TFixture> : QueryTestBase<TFixture>
         : base(fixture)
     {
         Fixture.TestSqlLoggerFactory.Clear();
-        // Fixture.TestSqlLoggerFactory.SetTestOutputHelper(testOutputHelper);
+        Fixture.TestSqlLoggerFactory.SetTestOutputHelper(testOutputHelper);
     }
 
     #region Roundtrip
@@ -123,7 +123,7 @@ public abstract class ArrayQueryTest<TFixture> : QueryTestBase<TFixture>
             entryCount: 1);
     }
 
-    [ConditionalTheory]
+    [ConditionalTheory(Skip = "https://github.com/dotnet/efcore/issues/30786")]
     [MemberData(nameof(IsAsyncData))]
     public virtual async Task SequenceEqual_with_array_literal(bool async)
         => await AssertQuery(
@@ -372,15 +372,15 @@ public abstract class ArrayQueryTest<TFixture> : QueryTestBase<TFixture>
             ss => ss.Set<ArrayEntity>().Where(e => new[] { 5, 6 }.All(p => e.IntArray.Contains(p))),
             entryCount: 1);
 
-    [ConditionalFact]
-    public virtual async Task Any_like_column()
+    [ConditionalTheory]
+    [MemberData(nameof(IsAsyncData))]
+    public virtual async Task Any_like_column(bool async)
     {
-        using var ctx = CreateContext();
-
-        await AssertTranslationFailed(
-            () => ctx.SomeEntities
-                .Where(e => e.StringArray.Any(p => EF.Functions.Like(p, "3")))
-                .ToListAsync());
+        await AssertQuery(
+            async,
+            ss => ss.Set<ArrayEntity>().Where(e => e.StringArray.Any(s => EF.Functions.Like(s, "3"))),
+            ss => ss.Set<ArrayEntity>().Where(e => e.StringArray.Any(s => s.Contains("3"))),
+            entryCount: 1);
     }
 
     #endregion Any/All
@@ -411,7 +411,7 @@ FROM "SomeEntities" AS s
         // Note that arrays of objects are treated specially by EF Core, so they're fine.
         // The below checks Bytea and ByteArray, which are the same CLR type (byte[]) but mapped to different PG types
         // (bytea and smallint[])
-        using var context = CreateContext();
+        await using var context = CreateContext();
 
         var exception = async
             ? await Assert.ThrowsAsync<InvalidOperationException>(
@@ -473,6 +473,23 @@ FROM "SomeEntities" AS s
 """);
     }
 
+    [Theory] // #2688
+    [MemberData(nameof(IsAsyncData))]
+    public async Task New_array_VisitChildren(bool async)
+    {
+        await AssertQuery(
+            async,
+            ss => ss.Set<ArrayEntity>().Select(e => new[] { e.NonNullableText, e.NullableText ?? "" }),
+            elementAsserter: Assert.Equal,
+            elementSorter: strings => strings != null ? string.Join(separator: "", strings) : null);
+
+        AssertSql(
+"""
+SELECT ARRAY[s."NonNullableText",COALESCE(s."NullableText", '')]::text[]
+FROM "SomeEntities" AS s
+""");
+    }
+
     #endregion
 
     #region Other translations
@@ -486,7 +503,7 @@ FROM "SomeEntities" AS s
                 .Where(e => e.IntArray.Append(5).SequenceEqual(new[] { 3, 4, 5 })),
             entryCount: 1);
 
-    [ConditionalTheory]
+    [ConditionalTheory(Skip = "https://github.com/dotnet/efcore/issues/30786")]
     [MemberData(nameof(IsAsyncData))]
     public virtual Task Concat(bool async)
         => AssertQuery(
