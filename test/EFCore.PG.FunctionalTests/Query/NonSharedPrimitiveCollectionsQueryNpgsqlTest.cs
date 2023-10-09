@@ -20,6 +20,24 @@ public class NonSharedPrimitiveCollectionsQueryNpgsqlTest : NonSharedPrimitiveCo
                 .Property(typeof(DateTime[]), "SomeArray")
                 .HasColumnType("timestamp without time zone[]"));
 
+    // Npgsql maps DateTime to timestamp with time zone by default, which requires UTC timestamps.
+    public override Task Array_of_DateTime_with_milliseconds()
+        => TestArray(
+            new DateTime(2023, 1, 1, 12, 30, 0, 123),
+            new DateTime(2023, 1, 1, 12, 30, 0, 124),
+            mb => mb.Entity<TestEntity>()
+                .Property(typeof(DateTime[]), "SomeArray")
+                .HasColumnType("timestamp without time zone[]"));
+
+    // Npgsql maps DateTime to timestamp with time zone by default, which requires UTC timestamps.
+    public override Task Array_of_DateTime_with_microseconds()
+        => TestArray(
+            new DateTime(2023, 1, 1, 12, 30, 0, 123, 456),
+            new DateTime(2023, 1, 1, 12, 30, 0, 123, 457),
+            mb => mb.Entity<TestEntity>()
+                .Property(typeof(DateTime[]), "SomeArray")
+                .HasColumnType("timestamp without time zone[]"));
+
     [ConditionalFact]
     public virtual Task Array_of_DateTime_utc()
         => TestArray(
@@ -31,18 +49,6 @@ public class NonSharedPrimitiveCollectionsQueryNpgsqlTest : NonSharedPrimitiveCo
         => TestArray(
             new DateTimeOffset(2023, 1, 1, 12, 30, 0, TimeSpan.Zero),
             new DateTimeOffset(2023, 1, 2, 12, 30, 0, TimeSpan.Zero));
-
-    [ConditionalFact(Skip = "#30630")] // This test will go away
-    public override async Task Array_of_geometry_is_not_supported()
-    {
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => InitializeAsync<TestContext>(
-                onConfiguring: options => options.UseNpgsql(o => o.UseNetTopologySuite()),
-                addServices: s => s.AddEntityFrameworkNpgsqlNetTopologySuite(),
-                onModelCreating: mb => mb.Entity<TestEntity>().Property<Point[]>("Points")));
-
-        Assert.Equal(CoreStrings.PropertyNotMapped("Point[]", "MyEntity", "Points"), exception.Message);
-    }
 
     [ConditionalFact]
     public override async Task Multidimensional_array_is_not_supported()

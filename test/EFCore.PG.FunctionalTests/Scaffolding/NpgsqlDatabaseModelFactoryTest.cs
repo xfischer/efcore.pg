@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore.Diagnostics.Internal;
+using Microsoft.EntityFrameworkCore.Storage.Json;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Diagnostics.Internal;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure.Internal;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Internal;
@@ -186,7 +187,7 @@ CREATE TABLE "Kilimanjaro" (Id int, B varchar, UNIQUE (B));
                 // ReSharper disable once PossibleNullReferenceException
                 Assert.Equal("K2", table.Name);
                 Assert.Equal(2, table.Columns.Count);
-                Assert.Equal(1, table.UniqueConstraints.Count);
+                Assert.Single(table.UniqueConstraints);
                 Assert.Empty(table.ForeignKeys);
             },
 """
@@ -209,7 +210,7 @@ CREATE TABLE "Kilimanjaro" (Id int, B varchar, UNIQUE (B), FOREIGN KEY (B) REFER
                 // ReSharper disable once PossibleNullReferenceException
                 Assert.Equal("K2", table.Name);
                 Assert.Equal(2, table.Columns.Count);
-                Assert.Equal(1, table.UniqueConstraints.Count);
+                Assert.Single(table.UniqueConstraints);
                 Assert.Empty(table.ForeignKeys);
             },
 """
@@ -232,7 +233,7 @@ CREATE TABLE "Kilimanjaro" (Id int, B varchar, UNIQUE (B));
                 // ReSharper disable once PossibleNullReferenceException
                 Assert.Equal("K.2", table.Name);
                 Assert.Equal(2, table.Columns.Count);
-                Assert.Equal(1, table.UniqueConstraints.Count);
+                Assert.Single(table.UniqueConstraints);
                 Assert.Empty(table.ForeignKeys);
             },
 """
@@ -256,7 +257,7 @@ CREATE TABLE "Kilimanjaro" (Id int, B varchar, UNIQUE (B));
                 // ReSharper disable once PossibleNullReferenceException
                 Assert.Equal("K2", table.Name);
                 Assert.Equal(2, table.Columns.Count);
-                Assert.Equal(1, table.UniqueConstraints.Count);
+                Assert.Single(table.UniqueConstraints);
                 Assert.Empty(table.ForeignKeys);
             },
 """
@@ -281,7 +282,7 @@ CREATE TABLE "db.2"."Kilimanjaro" (Id int, B varchar, UNIQUE (B));
                 // ReSharper disable once PossibleNullReferenceException
                 Assert.Equal("K.2", table.Name);
                 Assert.Equal(2, table.Columns.Count);
-                Assert.Equal(1, table.UniqueConstraints.Count);
+                Assert.Single(table.UniqueConstraints);
                 Assert.Empty(table.ForeignKeys);
             },
 """
@@ -306,7 +307,7 @@ CREATE TABLE "Kilimanjaro" (Id int, B varchar, UNIQUE (B));
                 // ReSharper disable once PossibleNullReferenceException
                 Assert.Equal("K.2", table.Name);
                 Assert.Equal(2, table.Columns.Count);
-                Assert.Equal(1, table.UniqueConstraints.Count);
+                Assert.Single(table.UniqueConstraints);
                 Assert.Empty(table.ForeignKeys);
             },
 """
@@ -331,7 +332,7 @@ CREATE TABLE "db.2"."Kilimanjaro" (Id int, B varchar, UNIQUE (B));
                 // ReSharper disable once PossibleNullReferenceException
                 Assert.Equal("K2", table.Name);
                 Assert.Equal(2, table.Columns.Count);
-                Assert.Equal(1, table.UniqueConstraints.Count);
+                Assert.Single(table.UniqueConstraints);
                 Assert.Empty(table.ForeignKeys);
             },
 """
@@ -1060,12 +1061,7 @@ CREATE TABLE "SystemColumnsTable"
 """,
             Enumerable.Empty<string>(),
             Enumerable.Empty<string>(),
-            dbModel =>
-            {
-                var columns = dbModel.Tables.Single().Columns;
-
-                Assert.Equal(1, columns.Count);
-            },
+            dbModel => Assert.Single(dbModel.Tables.Single().Columns),
             @"DROP TABLE ""SystemColumnsTable""");
 
     #endregion
@@ -2027,11 +2023,8 @@ CREATE TABLE bar (foreign_key int REFERENCES foo(some_num));
 """,
             Enumerable.Empty<string>(),
             Enumerable.Empty<string>(),
-            dbModel =>
-            {
-                // Enum columns are left out of the model for now (a warning is logged).
-                Assert.Equal(1, dbModel.Tables.Single(t => t.Name == "foo").Columns.Count);
-            },
+            // Enum columns are left out of the model for now (a warning is logged).
+            dbModel => Assert.Single(dbModel.Tables.Single(t => t.Name == "foo").Columns),
 """
 DROP TABLE bar;
 DROP TABLE foo;
@@ -2083,6 +2076,7 @@ CREATE TABLE column_types (
                 var typeMappingSource = new NpgsqlTypeMappingSource(
                     new TypeMappingSourceDependencies(
                         new ValueConverterSelector(new ValueConverterSelectorDependencies()),
+                        new JsonValueReaderWriterSource(new JsonValueReaderWriterSourceDependencies()),
                         Array.Empty<ITypeMappingSourcePlugin>()
                     ),
                     new RelationalTypeMappingSourceDependencies(Array.Empty<IRelationalTypeMappingSourcePlugin>()),

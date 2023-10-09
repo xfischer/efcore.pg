@@ -684,7 +684,6 @@ COMMENT ON COLUMN "People"."FullName" IS 'My comment';
 """);
     }
 
-    [ConditionalFact]
     public override async Task Add_column_with_collation()
     {
         await base.Add_column_with_collation();
@@ -693,30 +692,22 @@ COMMENT ON COLUMN "People"."FullName" IS 'My comment';
             @"ALTER TABLE ""People"" ADD ""Name"" text COLLATE ""POSIX"";");
     }
 
-    [ConditionalFact]
-    public override async Task Add_column_computed_with_collation()
+    public override async Task Add_column_computed_with_collation(bool stored)
     {
         if (TestEnvironment.PostgresVersion.IsUnder(12))
         {
-            await Assert.ThrowsAsync<NotSupportedException>(() => base.Add_column_computed_with_collation());
+            await Assert.ThrowsAsync<NotSupportedException>(() => base.Add_column_computed_with_collation(stored));
             return;
         }
 
-        // Non-stored generated columns aren't yet supported (PG12), so we override to used stored
-        await Test(
-            builder => builder.Entity("People").Property<int>("Id"),
-            _ => { },
-            builder => builder.Entity("People").Property<string>("Name")
-                .HasComputedColumnSql("'hello'", stored: true)
-                .UseCollation(NonDefaultCollation),
-            model =>
-            {
-                var table = Assert.Single(model.Tables);
-                Assert.Equal(2, table.Columns.Count);
-                var nameColumn = Assert.Single(table.Columns, c => c.Name == "Name");
-                Assert.Contains("hello", nameColumn.ComputedColumnSql);
-                Assert.Equal(NonDefaultCollation, nameColumn.Collation);
-            });
+        if (stored != true)
+        {
+            // Non-stored generated columns aren't yet supported (PG12)
+            await Assert.ThrowsAsync<NotSupportedException>(() => base.Create_table_with_computed_column(stored));
+            return;
+        }
+
+        await base.Add_column_computed_with_collation(stored);
 
         AssertSql(
             @"ALTER TABLE ""People"" ADD ""Name"" text COLLATE ""POSIX"" GENERATED ALWAYS AS ('hello') STORED;");
@@ -1143,7 +1134,6 @@ ALTER TABLE "People" ALTER COLUMN "FirstName" SET DEFAULT '';
             @"ALTER TABLE ""People"" ADD ""Sum"" integer GENERATED ALWAYS AS (""X"" - ""Y"") STORED NOT NULL;");
     }
 
-    [ConditionalFact]
     public override async Task Alter_column_change_computed_recreates_indexes()
     {
         if (TestEnvironment.PostgresVersion.IsUnder(12))
@@ -1809,7 +1799,6 @@ DROP SEQUENCE "People_Id_old_seq";
             @"ALTER TABLE ""People"" DROP COLUMN ""Id"";");
     }
 
-    [ConditionalFact]
     public override async Task Drop_column_computed_and_non_computed_with_dependency()
     {
         if (TestEnvironment.PostgresVersion.IsUnder(12))
@@ -1994,7 +1983,7 @@ DROP SEQUENCE "People_Id_old_seq";
             {
                 var table = Assert.Single(model.Tables);
                 var index = Assert.Single(table.Indexes);
-                Assert.Equal(1, index.Columns.Count);
+                Assert.Single(index.Columns);
                 Assert.Contains(table.Columns.Single(c => c.Name == "Name"), index.Columns);
 
                 // Scaffolding included/covered properties is currently blocked, see #2194
@@ -2038,7 +2027,7 @@ DROP SEQUENCE "People_Id_old_seq";
                 var table = Assert.Single(model.Tables);
                 var index = Assert.Single(table.Indexes);
                 Assert.Equal(@"(""Name"" IS NOT NULL)", index.Filter);
-                Assert.Equal(1, index.Columns.Count);
+                Assert.Single(index.Columns);
                 Assert.Contains(table.Columns.Single(c => c.Name == "Name"), index.Columns);
 
                 // Scaffolding included/covered properties is currently blocked, see #2194
@@ -2082,7 +2071,7 @@ DROP SEQUENCE "People_Id_old_seq";
                 var table = Assert.Single(model.Tables);
                 var index = Assert.Single(table.Indexes);
                 Assert.True(index.IsUnique);
-                Assert.Equal(1, index.Columns.Count);
+                Assert.Single(index.Columns);
                 Assert.Contains(table.Columns.Single(c => c.Name == "Name"), index.Columns);
 
                 // Scaffolding included/covered properties is currently blocked, see #2194
@@ -2128,7 +2117,7 @@ DROP SEQUENCE "People_Id_old_seq";
                 var index = Assert.Single(table.Indexes);
                 Assert.True(index.IsUnique);
                 Assert.Equal(@"(""Name"" IS NOT NULL)", index.Filter);
-                Assert.Equal(1, index.Columns.Count);
+                Assert.Single(index.Columns);
                 Assert.Contains(table.Columns.Single(c => c.Name == "Name"), index.Columns);
 
                 // Scaffolding included/covered properties is currently blocked, see #2194
@@ -2977,21 +2966,21 @@ CREATE COLLATION dummy (LOCALE = 'POSIX',
     {
         await Test(
             _ => { },
-            builder => builder.HasCollation("some_collation", locale: "en-u-ks-primary", provider: "icu", deterministic: false),
+            builder => builder.HasCollation("some_collation", locale: "en-u-ks-level1", provider: "icu", deterministic: false),
             model =>
             {
                 var collation = Assert.Single(PostgresCollation.GetCollations(model));
 
                 Assert.Equal("some_collation", collation.Name);
                 Assert.Equal("icu", collation.Provider);
-                Assert.Equal("en-u-ks-primary", collation.LcCollate);
-                Assert.Equal("en-u-ks-primary", collation.LcCtype);
+                Assert.Equal("en-u-ks-level1", collation.LcCollate);
+                Assert.Equal("en-u-ks-level1", collation.LcCtype);
                 Assert.False(collation.IsDeterministic);
             });
 
         AssertSql(
 """
-CREATE COLLATION some_collation (LOCALE = 'en-u-ks-primary',
+CREATE COLLATION some_collation (LOCALE = 'en-u-ks-level1',
     PROVIDER = icu,
     DETERMINISTIC = False
 );

@@ -5,6 +5,8 @@ public class NpgsqlComplianceTest : RelationalComplianceTestBase
     protected override ICollection<Type> IgnoredTestBases { get; } = new HashSet<Type>
     {
         // We have our own JSON support for now
+        typeof(JsonTypesTestBase),
+        typeof(JsonTypesRelationalTestBase),
         typeof(JsonUpdateTestBase<>),
         typeof(JsonQueryTestBase<>),
         typeof(JsonQueryAdHocTestBase),

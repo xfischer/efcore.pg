@@ -34,7 +34,7 @@ public static class NpgsqlPropertyBuilderExtensions
 
         name ??= NpgsqlModelExtensions.DefaultHiLoSequenceName;
 
-        var model = property.DeclaringEntityType.Model;
+        var model = property.DeclaringType.Model;
 
         if (model.FindSequence(name, schema) is null)
         {
@@ -90,7 +90,7 @@ public static class NpgsqlPropertyBuilderExtensions
 
         return name is null
             ? null
-            : propertyBuilder.Metadata.DeclaringEntityType.Model.Builder.HasSequence(name, schema, fromDataAnnotation);
+            : propertyBuilder.Metadata.DeclaringType.Model.Builder.HasSequence(name, schema, fromDataAnnotation);
     }
 
     /// <summary>
@@ -191,7 +191,7 @@ public static class NpgsqlPropertyBuilderExtensions
 
         return name == null
             ? null
-            : propertyBuilder.Metadata.DeclaringEntityType.Model.Builder.HasSequence(name, schema, fromDataAnnotation);
+            : propertyBuilder.Metadata.DeclaringType.Model.Builder.HasSequence(name, schema, fromDataAnnotation);
     }
 
     /// <summary>
@@ -645,43 +645,52 @@ public static class NpgsqlPropertyBuilderExtensions
     /// <summary>
     ///     Configures a PostgreSQL array conversion.
     /// </summary>
+    [Obsolete(
+        "HasPostgresArrayConversion has been replaced with the standard EF 8 primitive collection API, see https://www.npgsql.org/efcore/release-notes/8.0.html",
+        error: true)]
     public static PropertyBuilder<TElementProperty[]> HasPostgresArrayConversion<TElementProperty, TElementProvider>(
         this PropertyBuilder<TElementProperty[]> propertyBuilder,
         Expression<Func<TElementProperty, TElementProvider>> convertToProviderExpression,
         Expression<Func<TElementProvider, TElementProperty>> convertFromProviderExpression)
-        => propertyBuilder.HasPostgresArrayConversion<TElementProperty, TElementProvider>(
-            new ValueConverter<TElementProperty, TElementProvider>(
-                convertToProviderExpression, convertFromProviderExpression));
+        => throw new NotSupportedException(
+            "HasPostgresArrayConversion has been replaced with the standard EF 8 primitive collection API, see https://www.npgsql.org/efcore/release-notes/8.0.html");
 
     /// <summary>
     ///     Configures a PostgreSQL array conversion.
     /// </summary>
+    [Obsolete(
+        "HasPostgresArrayConversion has been replaced with the standard EF 8 primitive collection API, see https://www.npgsql.org/efcore/release-notes/8.0.html",
+        error: true)]
     public static PropertyBuilder<List<TElementProperty>> HasPostgresArrayConversion<TElementProperty, TElementProvider>(
         this PropertyBuilder<List<TElementProperty>> propertyBuilder,
         Expression<Func<TElementProperty, TElementProvider>> convertToProviderExpression,
         Expression<Func<TElementProvider, TElementProperty>> convertFromProviderExpression)
-        => propertyBuilder.HasConversion(
-            new NpgsqlArrayConverter<List<TElementProperty>, List<TElementProvider>>(
-                new ValueConverter<TElementProperty, TElementProvider>(
-                    convertToProviderExpression, convertFromProviderExpression)));
+        => throw new NotSupportedException(
+            "HasPostgresArrayConversion has been replaced with the standard EF 8 primitive collection API, see https://www.npgsql.org/efcore/release-notes/8.0.html");
 
     /// <summary>
     ///     Configures a PostgreSQL array conversion.
     /// </summary>
+    [Obsolete(
+        "HasPostgresArrayConversion has been replaced with the standard EF 8 primitive collection API, see https://www.npgsql.org/efcore/release-notes/8.0.html",
+        error: true)]
     public static PropertyBuilder<TElementProperty[]> HasPostgresArrayConversion<TElementProperty, TElementProvider>(
         this PropertyBuilder<TElementProperty[]> propertyBuilder,
         ValueConverter elementValueConverter)
-        => propertyBuilder.HasConversion(
-            new NpgsqlArrayConverter<TElementProperty[], TElementProvider[]>(elementValueConverter));
+        => throw new NotSupportedException(
+            "HasPostgresArrayConversion has been replaced with the standard EF 8 primitive collection API, see https://www.npgsql.org/efcore/release-notes/8.0.html");
 
     /// <summary>
     ///     Configures a PostgreSQL array conversion.
     /// </summary>
+    [Obsolete(
+        "HasPostgresArrayConversion has been replaced with the standard EF 8 primitive collection API, see https://www.npgsql.org/efcore/release-notes/8.0.html",
+        error: true)]
     public static PropertyBuilder<List<TElementProperty>> HasPostgresArrayConversion<TElementProperty, TElementProvider>(
         this PropertyBuilder<List<TElementProperty>> propertyBuilder,
         ValueConverter elementValueConverter)
-        => propertyBuilder.HasConversion(
-            new NpgsqlArrayConverter<List<TElementProperty>, List<TElementProvider>>(elementValueConverter));
+        => throw new NotSupportedException(
+            "HasPostgresArrayConversion has been replaced with the standard EF 8 primitive collection API, see https://www.npgsql.org/efcore/release-notes/8.0.html");
 
     #endregion Array value conversion
 

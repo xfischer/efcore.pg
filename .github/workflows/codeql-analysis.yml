@@ -27,7 +27,7 @@ on:
     - cron: '30 22 * * 6'
 
 env:
-  dotnet_sdk_version: '8.0.100-preview.2.23153.6'
+  dotnet_sdk_version: '8.0.100-rc.1.23455.8'
 
 jobs:
   analyze:
@@ -47,7 +47,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL

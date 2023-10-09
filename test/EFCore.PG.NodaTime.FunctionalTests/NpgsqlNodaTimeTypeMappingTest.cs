@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore.Design.Internal;
+using Microsoft.EntityFrameworkCore.Storage.Json;
 using NodaTime.Calendars;
 using NodaTime.TimeZones;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Internal;
@@ -498,6 +499,17 @@ public class NpgsqlNodaTimeTypeMappingTest
         Assert.Equal("NodaTime.LocalTime.FromHourMinuteSecondNanosecond(9, 30, 15, 1L)", CodeLiteral(LocalTime.FromHourMinuteSecondNanosecond(9, 30, 15, 1)));
     }
 
+    [Fact]
+    public void LocalTime_array_is_properly_mapped()
+    {
+        Assert.Equal("time[]", GetMapping(typeof(LocalTime[])).StoreType);
+        Assert.Same(typeof(LocalTime[]), GetMapping("time[]").ClrType);
+    }
+
+    [Fact]
+    public void LocalTime_list_is_properly_mapped()
+        => Assert.Equal("time[]", GetMapping(typeof(List<LocalTime>)).StoreType);
+
     #endregion time
 
     #region timetz
@@ -621,6 +633,7 @@ public class NpgsqlNodaTimeTypeMappingTest
     private static readonly NpgsqlTypeMappingSource Mapper = new(
         new TypeMappingSourceDependencies(
             new ValueConverterSelector(new ValueConverterSelectorDependencies()),
+            new JsonValueReaderWriterSource(new JsonValueReaderWriterSourceDependencies()),
             Array.Empty<ITypeMappingSourcePlugin>()),
         new RelationalTypeMappingSourceDependencies(
             new IRelationalTypeMappingSourcePlugin[] {

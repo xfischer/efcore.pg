@@ -1,4 +1,5 @@
-﻿using Npgsql.EntityFrameworkCore.PostgreSQL.Internal;
+﻿using Microsoft.EntityFrameworkCore.Storage.Json;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Internal;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata.Conventions;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata.Internal;
@@ -39,7 +40,7 @@ public class NpgsqlAnnotationCodeGeneratorTest
         var result = generator.GenerateFluentApiCalls(property, property.GetAnnotations().ToDictionary(a => a.Name, a => a))
             .Single();
         Assert.Equal(nameof(NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn), result.Method);
-        Assert.Equal(0, result.Arguments.Count);
+        Assert.Empty(result.Arguments);
 
         property = entity.GetProperties().Single(p => p.Name == "IdentityAlways");
         annotations = property.GetAnnotations().ToDictionary(a => a.Name, a => a);
@@ -47,7 +48,7 @@ public class NpgsqlAnnotationCodeGeneratorTest
         Assert.Contains(annotations, kv => kv.Key == NpgsqlAnnotationNames.ValueGenerationStrategy);
         result = generator.GenerateFluentApiCalls(property, annotations).Single();
         Assert.Equal(nameof(NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn), result.Method);
-        Assert.Equal(0, result.Arguments.Count);
+        Assert.Empty(result.Arguments);
 
         property = entity.GetProperties().Single(p => p.Name == "Serial");
         annotations = property.GetAnnotations().ToDictionary(a => a.Name, a => a);
@@ -56,7 +57,7 @@ public class NpgsqlAnnotationCodeGeneratorTest
         result = generator.GenerateFluentApiCalls(property, property.GetAnnotations().ToDictionary(a => a.Name, a => a))
             .Single();
         Assert.Equal(nameof(NpgsqlPropertyBuilderExtensions.UseSerialColumn), result.Method);
-        Assert.Equal(0, result.Arguments.Count);
+        Assert.Empty(result.Arguments);
 
         property = entity.GetProperties().Single(p => p.Name == "None");
         annotations = property.GetAnnotations().ToDictionary(a => a.Name, a => a);
@@ -394,6 +395,7 @@ public class NpgsqlAnnotationCodeGeneratorTest
             new NpgsqlTypeMappingSource(
                 new TypeMappingSourceDependencies(
                     new ValueConverterSelector(new ValueConverterSelectorDependencies()),
+                    new JsonValueReaderWriterSource(new JsonValueReaderWriterSourceDependencies()),
                     Array.Empty<ITypeMappingSourcePlugin>()
                 ),
                 new RelationalTypeMappingSourceDependencies(Array.Empty<IRelationalTypeMappingSourcePlugin>()),
