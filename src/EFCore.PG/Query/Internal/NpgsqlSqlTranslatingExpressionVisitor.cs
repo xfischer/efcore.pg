@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics.CodeAnalysis;
+using System.Net;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Query.Expressions.Internal;
@@ -115,6 +116,15 @@ public class NpgsqlSqlTranslatingExpressionVisitor : RelationalSqlTranslatingExp
             case ExpressionType.Convert
                 when unaryExpression.Type == typeof(ITuple) && unaryExpression.Operand.Type.IsAssignableTo(typeof(ITuple)):
                 return Visit(unaryExpression.Operand);
+
+            // We map both IPAddress and NpgsqlInet to PG inet, and translate many methods accepting NpgsqlInet, so ignore casts from
+            // IPAddress to NpgsqlInet.
+            // On the PostgreSQL side, cidr is also implicitly convertible to inet, and at the ADO.NET level NpgsqlCidr has a similar
+            // implicit conversion operator to NpgsqlInet. So remove that cast as well.
+            case ExpressionType.Convert
+                when unaryExpression.Type == typeof(NpgsqlInet)
+                && (unaryExpression.Operand.Type == typeof(IPAddress) || unaryExpression.Operand.Type == typeof(NpgsqlCidr)):
+                return Visit(unaryExpression.Operand);
         }
 
         return base.VisitUnary(unaryExpression);
@@ -176,7 +186,7 @@ public class NpgsqlSqlTranslatingExpressionVisitor : RelationalSqlTranslatingExp
                 var subtraction = _sqlExpressionFactory.MakeBinary(
                     ExpressionType.Subtract, sqlLeft!, sqlRight!, _typeMappingSource.FindMapping(typeof(int)))!;
 
-                return PostgresFunctionExpression.CreateWithNamedArguments(
+                return PgFunctionExpression.CreateWithNamedArguments(
                     "make_interval",
                     new[] {  subtraction },
                     new[] { "days" },
@@ -255,7 +265,7 @@ public class NpgsqlSqlTranslatingExpressionVisitor : RelationalSqlTranslatingExp
         if (newExpression.Type.IsAssignableTo(typeof(ITuple)))
         {
             return TryTranslateArguments(out var sqlArguments)
-                ? new PostgresRowValueExpression(sqlArguments, newExpression.Type)
+                ? new PgRowValueExpression(sqlArguments, newExpression.Type)
                 : QueryCompilationContext.NotTranslatedExpression;
         }
 
