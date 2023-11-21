@@ -8,17 +8,11 @@ namespace Npgsql.EntityFrameworkCore.PostgreSQL.Query;
 public class NorthwindQueryNpgsqlFixture<TModelCustomizer> : NorthwindQueryRelationalFixture<TModelCustomizer>
     where TModelCustomizer : IModelCustomizer, new()
 {
-    protected override ITestStoreFactory TestStoreFactory => NpgsqlNorthwindTestStoreFactory.Instance;
-    protected override Type ContextType => typeof(NorthwindNpgsqlContext);
+    protected override ITestStoreFactory TestStoreFactory
+        => NpgsqlNorthwindTestStoreFactory.Instance;
 
-    static NorthwindQueryNpgsqlFixture()
-    {
-        // TODO: Switch to using NpgsqlDataSource
-#pragma warning disable CS0618 // Type or member is obsolete
-        NpgsqlConnection.GlobalTypeMapper.EnableDynamicJsonMappings();
-        NpgsqlConnection.GlobalTypeMapper.EnableRecordsAsTuples();
-#pragma warning restore CS0618 // Type or member is obsolete
-    }
+    protected override Type ContextType
+        => typeof(NorthwindNpgsqlContext);
 
     public override DbContextOptionsBuilder AddOptions(DbContextOptionsBuilder builder)
     {

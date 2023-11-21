@@ -11,20 +11,14 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Utilities;
 namespace Npgsql.EntityFrameworkCore.PostgreSQL.Scaffolding.Internal;
 
 /// <summary>
-/// The default database model factory for Npgsql.
+///     The default database model factory for Npgsql.
 /// </summary>
 public class NpgsqlDatabaseModelFactory : DatabaseModelFactory
 {
     #region Fields
 
-    /// <summary>
-    /// The regular expression formatting string for schema and/or table names.
-    /// </summary>
     private const string NamePartRegex = @"(?:(?:""(?<part{0}>(?:(?:"""")|[^""])+)"")|(?<part{0}>[^\.\[""]+))";
 
-    /// <summary>
-    /// The <see cref="Regex"/> to extract the schema and/or table names.
-    /// </summary>
     private static readonly Regex SchemaTableNameExtractor =
         new(
             string.Format(
@@ -35,14 +29,8 @@ public class NpgsqlDatabaseModelFactory : DatabaseModelFactory
             RegexOptions.Compiled,
             TimeSpan.FromMilliseconds(1000.0));
 
-    /// <summary>
-    /// The types used for serial columns.
-    /// </summary>
     private static readonly string[] SerialTypes = { "int2", "int4", "int8" };
 
-    /// <summary>
-    /// The diagnostic logger instance.
-    /// </summary>
     private readonly IDiagnosticsLogger<DbLoggerCategory.Scaffolding> _logger;
 
     #endregion
@@ -50,10 +38,12 @@ public class NpgsqlDatabaseModelFactory : DatabaseModelFactory
     #region Public surface
 
     /// <summary>
-    /// Constructs an instance of the <see cref="NpgsqlDatabaseModelFactory"/> class.
+    ///     Constructs an instance of the <see cref="NpgsqlDatabaseModelFactory" /> class.
     /// </summary>
     public NpgsqlDatabaseModelFactory(IDiagnosticsLogger<DbLoggerCategory.Scaffolding> logger)
-        => _logger = Check.NotNull(logger, nameof(logger));
+    {
+        _logger = Check.NotNull(logger, nameof(logger));
+    }
 
     /// <inheritdoc />
     public override DatabaseModel Create(string connectionString, DatabaseModelFactoryOptions options)
@@ -114,7 +104,7 @@ public class NpgsqlDatabaseModelFactory : DatabaseModelFactory
 
             foreach (var table in databaseModel.Tables)
             {
-                while (table.Columns.Remove(null!)) {}
+                while (table.Columns.Remove(null!)) { }
             }
 
             foreach (var sequence in GetSequences(connection, databaseModel, schemaFilter, _logger))
@@ -136,7 +126,7 @@ public class NpgsqlDatabaseModelFactory : DatabaseModelFactory
                 // We may have dropped or skipped columns. We load these because constraints take them into
                 // account when referencing columns, but must now get rid of them before returning
                 // the database model.
-                while (table.Columns.Remove(null!)) {}
+                while (table.Columns.Remove(null!)) { }
             }
 
             foreach (var schema in schemaList
@@ -176,9 +166,11 @@ public class NpgsqlDatabaseModelFactory : DatabaseModelFactory
             return;
         }
 
-        var commandText = @"
-SELECT datcollate FROM pg_database WHERE datname=current_database() AND
-        datcollate <> (SELECT datcollate FROM pg_database WHERE datname='template1')";
+        var commandText = """
+SELECT datcollate
+FROM pg_database
+WHERE datname=current_database() AND datcollate <> (SELECT datcollate FROM pg_database WHERE datname='template1')
+""";
         using var command = new NpgsqlCommand(commandText, connection);
         using var reader = command.ExecuteReader();
         if (reader.Read())
@@ -188,7 +180,7 @@ SELECT datcollate FROM pg_database WHERE datname=current_database() AND
     }
 
     /// <summary>
-    /// Queries the database for defined tables and registers them with the model.
+    ///     Queries the database for defined tables and registers them with the model.
     /// </summary>
     private static IEnumerable<DatabaseTable> GetTables(
         NpgsqlConnection connection,
@@ -199,7 +191,7 @@ SELECT datcollate FROM pg_database WHERE datname=current_database() AND
         IDiagnosticsLogger<DbLoggerCategory.Scaffolding> logger)
     {
         var filter = tableFilter is not null ? $"AND {tableFilter("ns.nspname", "cls.relname")}" : null;
-        var commandText = $@"
+        var commandText = $"""
 SELECT
     nspname, relname, relkind, description,
     {(connection.PostgreSqlVersion >= new Version(8, 2) ? "reloptions" : "'{}'::text[] AS reloptions")}
@@ -222,7 +214,8 @@ WHERE
       objid=cls.oid AND
       deptype IN ('e', 'x')
   )
-  {filter}";
+  {filter}
+""";
 
         var tables = new List<DatabaseTable>();
 
@@ -270,7 +263,7 @@ WHERE
     }
 
     /// <summary>
-    /// Queries the database for defined columns and registers them with the model.
+    ///     Queries the database for defined columns and registers them with the model.
     /// </summary>
     private static void GetColumns(
         NpgsqlConnection connection,
@@ -280,7 +273,7 @@ WHERE
         HashSet<string> enums,
         IDiagnosticsLogger<DbLoggerCategory.Scaffolding> logger)
     {
-        var commandText = $@"
+        var commandText = $"""
 SELECT
   nspname,
   cls.relname,
@@ -307,8 +300,8 @@ SELECT
 
   -- Sequence options for identity columns
   {(connection.PostgreSqlVersion >= new Version(10, 0) ?
-      "format_type(seqtypid, 0) AS seqtype, seqstart, seqmin, seqmax, seqincrement, seqcycle, seqcache" :
-      "NULL AS seqtype, NULL AS seqstart, NULL AS seqmin, NULL AS seqmax, NULL AS seqincrement, NULL AS seqcycle, NULL AS seqcache")}
+        "format_type(seqtypid, 0) AS seqtype, seqstart, seqmin, seqmax, seqincrement, seqcycle, seqcache" :
+        "NULL AS seqtype, NULL AS seqstart, NULL AS seqmin, NULL AS seqmax, NULL AS seqincrement, NULL AS seqcycle, NULL AS seqcache")}
 
 FROM pg_class AS cls
 JOIN pg_namespace AS ns ON ns.oid = cls.relnamespace
@@ -340,14 +333,16 @@ WHERE
       deptype IN ('e', 'x')
   )
   {tableFilter}
-ORDER BY attnum";
+ORDER BY attnum
+""";
 
         using var command = new NpgsqlCommand(commandText, connection);
         using var reader = command.ExecuteReader();
 
-        var tableGroups = reader.Cast<DbDataRecord>().GroupBy(ddr => (
-            tableSchema: ddr.GetFieldValue<string>("nspname"),
-            tableName: ddr.GetFieldValue<string>("relname")));
+        var tableGroups = reader.Cast<DbDataRecord>().GroupBy(
+            ddr => (
+                tableSchema: ddr.GetFieldValue<string>("nspname"),
+                tableName: ddr.GetFieldValue<string>("relname")));
 
         foreach (var tableGroup in tableGroups)
         {
@@ -384,8 +379,7 @@ ORDER BY attnum";
 
                 // Enum types cannot be scaffolded for now (nor can domains of enum types),
                 // skip with an informative message
-                if (enums.Contains(formattedTypeName) ||
-                    formattedBaseTypeName is not null && enums.Contains(formattedBaseTypeName))
+                if (enums.Contains(formattedTypeName) || formattedBaseTypeName is not null && enums.Contains(formattedBaseTypeName))
                 {
                     logger.EnumColumnSkippedWarning($"{DisplayName(tableSchema, tableName)}.{column.Name}");
                     // We need to know about skipped columns because constraints take them into
@@ -395,14 +389,16 @@ ORDER BY attnum";
                 }
 
                 // Default values and PostgreSQL 12 generated columns
+                var defaultValueSql = record.GetValueOrDefault<string>("default");
                 if (record.GetFieldValue<string>("attgenerated") == "s")
                 {
-                    column.ComputedColumnSql = record.GetValueOrDefault<string>("default");
+                    column.ComputedColumnSql = defaultValueSql;
                     column.IsStored = true;
                 }
                 else
                 {
-                    column.DefaultValueSql = record.GetValueOrDefault<string>("default");
+                    column.DefaultValueSql = defaultValueSql;
+                    column.DefaultValue = ParseClrDefault(storeType, defaultValueSql);
                     AdjustDefaults(column, systemTypeName);
                 }
 
@@ -427,14 +423,14 @@ ORDER BY attnum";
                         if (SerialTypes.Contains(systemTypeName))
                         {
                             var seqName = $"{column.Table.Name}_{column.Name}_seq";
-                            if (column.Table.Schema == "public" &&
-                                (column.DefaultValueSql == $"nextval('{seqName}'::regclass)" ||
-                                    column.DefaultValueSql == $"nextval('\"{seqName}\"'::regclass)")
-                                ||  // non-public schema
-                                column.DefaultValueSql == $"nextval('{column.Table.Schema}.{seqName}'::regclass)" ||
-                                column.DefaultValueSql == $"nextval('{column.Table.Schema}.\"{seqName}\"'::regclass)" ||
-                                column.DefaultValueSql == $"nextval('\"{column.Table.Schema}\".{seqName}'::regclass)" ||
-                                column.DefaultValueSql == $"nextval('\"{column.Table.Schema}\".\"{seqName}\"'::regclass)")
+                            if (column.Table.Schema == "public"
+                                && (column.DefaultValueSql == $"nextval('{seqName}'::regclass)"
+                                    || column.DefaultValueSql == $"nextval('\"{seqName}\"'::regclass)")
+                                || // non-public schema
+                                column.DefaultValueSql == $"nextval('{column.Table.Schema}.{seqName}'::regclass)"
+                                || column.DefaultValueSql == $"nextval('{column.Table.Schema}.\"{seqName}\"'::regclass)"
+                                || column.DefaultValueSql == $"nextval('\"{column.Table.Schema}\".{seqName}'::regclass)"
+                                || column.DefaultValueSql == $"nextval('\"{column.Table.Schema}\".\"{seqName}\"'::regclass)")
                             {
                                 column.DefaultValueSql = null;
                                 // Serial is the default value generation strategy, so NpgsqlAnnotationCodeGenerator
@@ -505,8 +501,38 @@ ORDER BY attnum";
         }
     }
 
+    private static object? ParseClrDefault(string dataTypeName, string? defaultValueSql)
+    {
+        defaultValueSql = defaultValueSql?.Trim();
+
+        if (string.IsNullOrEmpty(defaultValueSql))
+        {
+            return null;
+        }
+
+        while (defaultValueSql.StartsWith('(') && defaultValueSql.EndsWith(')'))
+        {
+            defaultValueSql = (defaultValueSql.Substring(1, defaultValueSql.Length - 2)).Trim();
+        }
+
+        return dataTypeName switch
+        {
+            "bool" or "boolean" => defaultValueSql switch
+            {
+                "true" or "yes" or "on" or "1" => true,
+                "false" or "no" or "off" or "0" => false,
+                _ => null
+            },
+            "smallint" or "int2" => short.TryParse(defaultValueSql, CultureInfo.InvariantCulture, out var @short) ? @short : null,
+            "integer" or "int" or "int4" => int.TryParse(defaultValueSql, CultureInfo.InvariantCulture, out var @int) ? @int : null,
+            "bigint" or "int8" => long.TryParse(defaultValueSql, CultureInfo.InvariantCulture, out var @long) ? @long : null,
+
+            _ => null
+        };
+    }
+
     /// <summary>
-    /// Queries the database for defined indexes and registers them with the model.
+    ///     Queries the database for defined indexes and registers them with the model.
     /// </summary>
     private static void GetIndexes(
         NpgsqlConnection connection,
@@ -533,7 +559,8 @@ ORDER BY attnum";
         }
         catch (PostgresException e)
         {
-            logger.Logger.LogWarning(e,
+            logger.Logger.LogWarning(
+                e,
                 "Could not load index operator classes from pg_opclass. Operator classes will not be scaffolded");
         }
 
@@ -551,7 +578,7 @@ ORDER BY attnum";
             }
         }
 
-        var commandText = $@"
+        var commandText = $"""
 SELECT
   idxcls.oid AS idx_oid,
   nspname,
@@ -597,14 +624,16 @@ WHERE
       objid=cls.oid AND
       deptype IN ('e', 'x')
   )
-  {tableFilter}";
+  {tableFilter}
+""";
 
         using (var command = new NpgsqlCommand(commandText, connection))
         using (var reader = command.ExecuteReader())
         {
-            var tableGroups = reader.Cast<DbDataRecord>().GroupBy(ddr => (
-                tableSchema: ddr.GetFieldValue<string>("nspname"),
-                tableName: ddr.GetFieldValue<string>("cls_relname")));
+            var tableGroups = reader.Cast<DbDataRecord>().GroupBy(
+                ddr => (
+                    tableSchema: ddr.GetFieldValue<string>("nspname"),
+                    tableName: ddr.GetFieldValue<string>("cls_relname")));
 
             foreach (var tableGroup in tableGroups)
             {
@@ -760,7 +789,7 @@ WHERE
     }
 
     /// <summary>
-    /// Queries the database for defined constraints and registers them with the model.
+    ///     Queries the database for defined constraints and registers them with the model.
     /// </summary>
     private static void GetConstraints(
         NpgsqlConnection connection,
@@ -770,7 +799,7 @@ WHERE
         out List<uint> constraintIndexes,
         IDiagnosticsLogger<DbLoggerCategory.Scaffolding> logger)
     {
-        var commandText = $@"
+        var commandText = $"""
 SELECT
   ns.nspname,
   cls.relname,
@@ -804,15 +833,17 @@ WHERE
       objid=cls.oid AND
       deptype IN ('e', 'x')
   )
-  {tableFilter}";
+  {tableFilter}
+""";
 
         using var command = new NpgsqlCommand(commandText, connection);
         using var reader = command.ExecuteReader();
 
         constraintIndexes = new List<uint>();
-        var tableGroups = reader.Cast<DbDataRecord>().GroupBy(ddr => (
-            tableSchema: ddr.GetFieldValue<string>("nspname"),
-            tableName: ddr.GetFieldValue<string>("relname")));
+        var tableGroups = reader.Cast<DbDataRecord>().GroupBy(
+            ddr => (
+                tableSchema: ddr.GetFieldValue<string>("nspname"),
+                tableName: ddr.GetFieldValue<string>("relname")));
 
         foreach (var tableGroup in tableGroups)
         {
@@ -825,11 +856,7 @@ WHERE
             foreach (var primaryKeyRecord in tableGroup.Where(ddr => ddr.GetFieldValue<string>("contype") == "p"))
             {
                 var pkName = primaryKeyRecord.GetValueOrDefault<string>("conname");
-                var primaryKey = new DatabasePrimaryKey
-                {
-                    Table = table,
-                    Name = pkName
-                };
+                var primaryKey = new DatabasePrimaryKey { Table = table, Name = pkName };
 
                 foreach (var pkColumnIndex in primaryKeyRecord.GetFieldValue<short[]>("conkey"))
                 {
@@ -857,11 +884,13 @@ WHERE
                 var onDeleteAction = foreignKeyRecord.GetFieldValue<string>("confdeltype");
 
                 var principalTable =
-                    tables.FirstOrDefault(t =>
-                        principalTableSchema == t.Schema && principalTableName == t.Name)
-                    ?? tables.FirstOrDefault(t =>
-                        principalTableSchema.Equals(t.Schema, StringComparison.OrdinalIgnoreCase) &&
-                        principalTableName.Equals(t.Name, StringComparison.OrdinalIgnoreCase));
+                    tables.FirstOrDefault(
+                        t =>
+                            principalTableSchema == t.Schema && principalTableName == t.Name)
+                    ?? tables.FirstOrDefault(
+                        t =>
+                            principalTableSchema.Equals(t.Schema, StringComparison.OrdinalIgnoreCase)
+                            && principalTableName.Equals(t.Name, StringComparison.OrdinalIgnoreCase));
 
                 if (principalTable is null)
                 {
@@ -916,11 +945,7 @@ WHERE
 
                 logger.UniqueConstraintFound(name, DisplayName(tableSchema, tableName));
 
-                var uniqueConstraint = new DatabaseUniqueConstraint
-                {
-                    Table = table,
-                    Name = name
-                };
+                var uniqueConstraint = new DatabaseUniqueConstraint { Table = table, Name = name };
 
                 foreach (var columnIndex in record.GetFieldValue<short[]>("conkey"))
                 {
@@ -943,7 +968,7 @@ WHERE
     }
 
     /// <summary>
-    /// Queries the database for defined sequences and registers them with the model.
+    ///     Queries the database for defined sequences and registers them with the model.
     /// </summary>
     private static IEnumerable<DatabaseSequence> GetSequences(
         NpgsqlConnection connection,
@@ -952,7 +977,7 @@ WHERE
         IDiagnosticsLogger<DbLoggerCategory.Scaffolding> logger)
     {
         // Note: we consult information_schema.sequences instead of pg_sequence but the latter was only introduced in PG 10
-        var commandText = $@"
+        var commandText = $"""
 SELECT
   sequence_schema, sequence_name,
   data_type AS seqtype,
@@ -973,7 +998,8 @@ WHERE
   /* AND seqtype IN ('integer', 'bigint', 'smallint') */
   /* Filter out owned serial and identity sequences */
   AND NOT EXISTS (SELECT * FROM pg_depend AS dep WHERE dep.objid = cls.oid AND dep.deptype IN ('i', 'I', 'a'))
-  {(schemaFilter is not null ? $"AND {schemaFilter("nspname")}" : null)}";
+  {(schemaFilter is not null ? $"AND {schemaFilter("nspname")}" : null)}
+""";
 
         using var command = new NpgsqlCommand(commandText, connection);
         using var reader = command.ExecuteReader();
@@ -1002,7 +1028,7 @@ WHERE
     }
 
     /// <summary>
-    /// Queries the database for defined enums and registers them with the model.
+    ///     Queries the database for defined enums and registers them with the model.
     /// </summary>
     private static HashSet<string> GetEnums(NpgsqlConnection connection, DatabaseModel databaseModel)
     {
@@ -1014,7 +1040,7 @@ WHERE
             return enums;
         }
 
-        var commandText = $@"
+        var commandText = $"""
 SELECT
   nspname,
   typname,
@@ -1022,7 +1048,8 @@ SELECT
 FROM pg_enum
 JOIN pg_type ON pg_type.oid = enumtypid
 JOIN pg_namespace ON pg_namespace.oid = pg_type.typnamespace
-GROUP BY nspname, typname";
+GROUP BY nspname, typname
+""";
 
         using var command = new NpgsqlCommand(commandText, connection);
         using var reader = command.ExecuteReader();
@@ -1047,13 +1074,15 @@ GROUP BY nspname, typname";
     }
 
     /// <summary>
-    /// Queries the installed database extensions and registers them with the model.
+    ///     Queries the installed database extensions and registers them with the model.
     /// </summary>
     private static void GetExtensions(NpgsqlConnection connection, DatabaseModel databaseModel)
     {
-        const string commandText = @"
-SELECT ns.nspname, extname, extversion FROM pg_extension
-JOIN pg_namespace ns ON ns.oid=extnamespace";
+        const string commandText = """
+SELECT ns.nspname, extname, extversion
+FROM pg_extension
+JOIN pg_namespace ns ON ns.oid=extnamespace
+""";
         using var command = new NpgsqlCommand(commandText, connection);
         using var reader = command.ExecuteReader();
 
@@ -1078,7 +1107,7 @@ JOIN pg_namespace ns ON ns.oid=extnamespace";
         string internalSchemas,
         IDiagnosticsLogger<DbLoggerCategory.Scaffolding> logger)
     {
-        var commandText = @$"
+        var commandText = $"""
 SELECT
     nspname, collname, collprovider, collcollate, collctype,
     {(connection.PostgreSqlVersion >= new Version(15, 0) ? "colliculocale" : "NULL AS colliculocale")},
@@ -1086,7 +1115,8 @@ SELECT
 FROM pg_collation coll
     JOIN pg_namespace ns ON ns.oid=coll.collnamespace
 WHERE
-    nspname NOT IN ({internalSchemas})";
+    nspname NOT IN ({internalSchemas})
+""";
 
         try
         {
@@ -1146,7 +1176,7 @@ WHERE
     #region Configure default values
 
     /// <summary>
-    /// Configures the default value for a column.
+    ///     Configures the default value for a column.
     /// </summary>
     /// <param name="column">The column to configure.</param>
     /// <param name="systemTypeName">The type name of the column.</param>
@@ -1182,12 +1212,12 @@ WHERE
             }
         }
 
-        if (systemTypeName == "bool" && defaultValue == "false" ||
-            systemTypeName == "date" && defaultValue == "'0001-01-01'::date" ||
-            systemTypeName == "timestamp" && defaultValue == "'1900-01-01 00:00:00'::timestamp without time zone" ||
-            systemTypeName == "time" && defaultValue == "'00:00:00'::time without time zone" ||
-            systemTypeName == "interval" && defaultValue == "'00:00:00'::interval" ||
-            systemTypeName == "uuid" && defaultValue == "'00000000-0000-0000-0000-000000000000'::uuid")
+        if (systemTypeName == "bool" && defaultValue == "false"
+            || systemTypeName == "date" && defaultValue == "'0001-01-01'::date"
+            || systemTypeName == "timestamp" && defaultValue == "'1900-01-01 00:00:00'::timestamp without time zone"
+            || systemTypeName == "time" && defaultValue == "'00:00:00'::time without time zone"
+            || systemTypeName == "interval" && defaultValue == "'00:00:00'::interval"
+            || systemTypeName == "uuid" && defaultValue == "'00000000-0000-0000-0000-000000000000'::uuid")
         {
             column.DefaultValueSql = null;
         }
@@ -1269,8 +1299,12 @@ WHERE
 
     private sealed class SequenceInfo
     {
-        public SequenceInfo(string storeType) => StoreType = storeType;
-        public string StoreType { get; set; }
+        public SequenceInfo(string storeType)
+        {
+            StoreType = storeType;
+        }
+
+        public string StoreType { get; }
         public long? StartValue { get; set; }
         public long? MinValue { get; set; }
         public long? MaxValue { get; set; }
@@ -1284,7 +1318,7 @@ WHERE
     #region Filter fragment generators
 
     /// <summary>
-    /// Builds a delegate to generate a schema filter fragment.
+    ///     Builds a delegate to generate a schema filter fragment.
     /// </summary>
     private static Func<string, string>? GenerateSchemaFilter(IReadOnlyList<string> schemas)
         => schemas.Any()
@@ -1292,7 +1326,7 @@ WHERE
             : null;
 
     /// <summary>
-    /// Builds a delegate to generate a table filter fragment.
+    ///     Builds a delegate to generate a table filter fragment.
     /// </summary>
     private static Func<string, string, string>? GenerateTableFilter(
         IReadOnlyList<(string? Schema, string Table)> tables,
@@ -1369,7 +1403,7 @@ WHERE
     #region Utilities
 
     /// <summary>
-    /// Type names as returned by PostgreSQL's format_type need to be cleaned up a bit
+    ///     Type names as returned by PostgreSQL's format_type need to be cleaned up a bit
     /// </summary>
     private static string AdjustFormattedTypeName(string formattedTypeName)
     {
@@ -1388,7 +1422,7 @@ WHERE
     }
 
     /// <summary>
-    /// Maps a character to a <see cref="ReferentialAction"/>.
+    ///     Maps a character to a <see cref="ReferentialAction" />.
     /// </summary>
     private static ReferentialAction ConvertToReferentialAction(string onDeleteAction)
         => onDeleteAction switch
@@ -1403,14 +1437,14 @@ WHERE
         };
 
     /// <summary>
-    /// Constructs the display name given a schema and table name.
+    ///     Constructs the display name given a schema and table name.
     /// </summary>
     // TODO: should this default to/screen out the public schema?
     private static string DisplayName(string? schema, string name)
         => string.IsNullOrEmpty(schema) ? name : $"{schema}.{name}";
 
     /// <summary>
-    /// Parses the table name into a tuple of schema name and table name where the schema may be null.
+    ///     Parses the table name into a tuple of schema name and table name where the schema may be null.
     /// </summary>
     private static (string? Schema, string Table) Parse(string table)
     {
@@ -1428,9 +1462,10 @@ WHERE
     }
 
     /// <summary>
-    /// Wraps a string literal in single quotes.
+    ///     Wraps a string literal in single quotes.
     /// </summary>
-    private static string EscapeLiteral(string? s) => $"'{s}'";
+    private static string EscapeLiteral(string? s)
+        => $"'{s}'";
 
     #endregion
 }

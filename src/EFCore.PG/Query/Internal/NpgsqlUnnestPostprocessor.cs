@@ -1,13 +1,10 @@
-// Licensed to the .NET Foundation under one or more agreements.
-// The .NET Foundation licenses this file to you under the MIT license.
-
 using System.Diagnostics.CodeAnalysis;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Query.Expressions.Internal;
 
 namespace Npgsql.EntityFrameworkCore.PostgreSQL.Query.Internal;
 
 /// <summary>
-///     Locates instances of <see cref="PgUnnestExpression"/> in the tree and prunes the WITH ORDINALITY clause from them if the
+///     Locates instances of <see cref="PgUnnestExpression" /> in the tree and prunes the WITH ORDINALITY clause from them if the
 ///     ordinality column isn't referenced anywhere.
 /// </summary>
 /// <remarks>
@@ -46,8 +43,9 @@ public class NpgsqlUnnestPostprocessor : ExpressionVisitor
                     if (unnest is not null
                         && !selectExpression.Orderings.Select(o => o.Expression)
                             .Concat(selectExpression.Projection.Select(p => p.Expression))
-                            .Any(p => p is ColumnExpression { Name: "ordinality", Table: var ordinalityTable }
-                                && ordinalityTable == table))
+                            .Any(
+                                p => p is ColumnExpression { Name: "ordinality", Table: var ordinalityTable }
+                                    && ordinalityTable == table))
                     {
                         if (newTables is null)
                         {
@@ -61,14 +59,9 @@ public class NpgsqlUnnestPostprocessor : ExpressionVisitor
 
                         var newUnnest = new PgUnnestExpression(unnest.Alias, unnest.Array, unnest.ColumnName, withOrdinality: false);
 
-                        // TODO: Simplify this via the newly-introduced JoinExpressionBase.Update
                         newTables[i] = table switch
                         {
-                            InnerJoinExpression ij => ij.Update(newUnnest, ij.JoinPredicate),
-                            LeftJoinExpression lj => lj.Update(newUnnest, lj.JoinPredicate),
-                            CrossJoinExpression cj => cj.Update(newUnnest),
-                            CrossApplyExpression ca => ca.Update(newUnnest),
-                            OuterApplyExpression oa => oa.Update(newUnnest),
+                            JoinExpressionBase j => j.Update(newUnnest),
                             PgUnnestExpression => newUnnest,
                             _ => throw new UnreachableException()
                         };

@@ -1,13 +1,14 @@
-﻿using NpgsqlTypes;
-using System.Text;
+﻿using System.Text;
+using System.Text.Json;
+using Microsoft.EntityFrameworkCore.Storage.Json;
 
 namespace Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.Mapping;
 
 /// <summary>
-/// The type mapping for the PostgreSQL pg_lsn type.
+///     The type mapping for the PostgreSQL pg_lsn type.
 /// </summary>
 /// <remarks>
-/// See: https://www.postgresql.org/docs/current/datatype-pg-lsn.html
+///     See: https://www.postgresql.org/docs/current/datatype-pg-lsn.html
 /// </remarks>
 public class NpgsqlPgLsnTypeMapping : NpgsqlTypeMapping
 {
@@ -17,8 +18,20 @@ public class NpgsqlPgLsnTypeMapping : NpgsqlTypeMapping
     ///     any release. You should only use it directly in your code with extreme caution and knowing that
     ///     doing so can result in application failures when updating to a new Entity Framework Core release.
     /// </summary>
+    public static NpgsqlPgLsnTypeMapping Default { get; } = new();
+
+    /// <summary>
+    ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+    ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+    ///     any release. You should only use it directly in your code with extreme caution and knowing that
+    ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+    /// </summary>
     public NpgsqlPgLsnTypeMapping()
-        : base("pg_lsn", typeof(NpgsqlLogSequenceNumber), NpgsqlDbType.PgLsn) {}
+        : base(
+            "pg_lsn", typeof(NpgsqlLogSequenceNumber), NpgsqlDbType.PgLsn,
+            jsonValueReaderWriter: JsonLogSequenceNumberReaderWriter.Instance)
+    {
+    }
 
     /// <summary>
     ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
@@ -27,7 +40,9 @@ public class NpgsqlPgLsnTypeMapping : NpgsqlTypeMapping
     ///     doing so can result in application failures when updating to a new Entity Framework Core release.
     /// </summary>
     protected NpgsqlPgLsnTypeMapping(RelationalTypeMappingParameters parameters)
-        : base(parameters, NpgsqlDbType.PgLsn) {}
+        : base(parameters, NpgsqlDbType.PgLsn)
+    {
+    }
 
     /// <summary>
     ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
@@ -48,8 +63,8 @@ public class NpgsqlPgLsnTypeMapping : NpgsqlTypeMapping
     {
         var lsn = (NpgsqlLogSequenceNumber)value;
         var builder = new StringBuilder("PG_LSN '")
-                .Append(lsn.ToString())
-                .Append('\'');
+            .Append(lsn.ToString())
+            .Append('\'');
         return builder.ToString();
     }
 
@@ -67,4 +82,19 @@ public class NpgsqlPgLsnTypeMapping : NpgsqlTypeMapping
 
     private static readonly ConstructorInfo Constructor =
         typeof(NpgsqlLogSequenceNumber).GetConstructor(new[] { typeof(ulong) })!;
+
+    private sealed class JsonLogSequenceNumberReaderWriter : JsonValueReaderWriter<NpgsqlLogSequenceNumber>
+    {
+        public static JsonLogSequenceNumberReaderWriter Instance { get; } = new();
+
+        private JsonLogSequenceNumberReaderWriter()
+        {
+        }
+
+        public override NpgsqlLogSequenceNumber FromJsonTyped(ref Utf8JsonReaderManager manager, object? existingObject = null)
+            => NpgsqlLogSequenceNumber.Parse(manager.CurrentReader.GetString()!);
+
+        public override void ToJsonTyped(Utf8JsonWriter writer, NpgsqlLogSequenceNumber value)
+            => writer.WriteStringValue(value.ToString());
+    }
 }

@@ -5,8 +5,11 @@ namespace Npgsql.EntityFrameworkCore.PostgreSQL.Query;
 
 public class GearsOfWarQueryNpgsqlFixture : GearsOfWarQueryRelationalFixture
 {
-    protected override string StoreName => "GearsOfWarQueryTest";
-    protected override ITestStoreFactory TestStoreFactory => NpgsqlTestStoreFactory.Instance;
+    protected override string StoreName
+        => "GearsOfWarQueryTest";
+
+    protected override ITestStoreFactory TestStoreFactory
+        => NpgsqlTestStoreFactory.Instance;
 
     private GearsOfWarData _expectedData;
 
@@ -65,8 +68,6 @@ public class GearsOfWarQueryNpgsqlFixture : GearsOfWarQueryRelationalFixture
 
         foreach (var mission in missions)
         {
-            // var newThing = new DateTimeOffset(orig.Ticks - (orig.Ticks % (TimeSpan.TicksPerMillisecond / 1000)), TimeSpan.Zero);
-
             mission.Timeline = new DateTimeOffset(
                 mission.Timeline.Ticks - (mission.Timeline.Ticks % (TimeSpan.TicksPerMillisecond / 1000)), TimeSpan.Zero);
         }

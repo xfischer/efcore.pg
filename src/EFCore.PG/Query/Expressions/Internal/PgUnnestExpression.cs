@@ -5,7 +5,7 @@ namespace Npgsql.EntityFrameworkCore.PostgreSQL.Query.Expressions.Internal;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         This expression is just a <see cref="TableValuedFunctionExpression" />, adding the ability to provide an explicit column name
+///         This expression is just a <see cref="PgTableValuedFunctionExpression" />, adding the ability to provide an explicit column name
 ///         for its output (<c>SELECT * FROM unnest(array) AS f(foo)</c>). This is necessary since when the column name isn't explicitly
 ///         specified, it is automatically identical to the table alias (<c>f</c> above); since the table alias may get uniquified by
 ///         EF, this would break queries.
@@ -21,7 +21,7 @@ namespace Npgsql.EntityFrameworkCore.PostgreSQL.Query.Expressions.Internal;
 ///         doing so can result in application failures when updating to a new Entity Framework Core release.
 ///     </para>
 /// </remarks>
-public class PgUnnestExpression : TableValuedFunctionExpression
+public class PgUnnestExpression : PgTableValuedFunctionExpression
 {
     /// <summary>
     ///     The array to be un-nested into a table.
@@ -44,18 +44,8 @@ public class PgUnnestExpression : TableValuedFunctionExpression
     ///     any release. You should only use it directly in your code with extreme caution and knowing that
     ///     doing so can result in application failures when updating to a new Entity Framework Core release.
     /// </remarks>
-    public virtual string ColumnName { get; }
-
-    /// <summary>
-    ///     Whether to project an additional ordinality column containing the index of each element in the array.
-    /// </summary>
-    /// <remarks>
-    ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
-    ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
-    ///     any release. You should only use it directly in your code with extreme caution and knowing that
-    ///     doing so can result in application failures when updating to a new Entity Framework Core release.
-    /// </remarks>
-    public virtual bool WithOrdinality { get; }
+    public virtual string ColumnName
+        => ColumnInfos![0].Name;
 
     /// <summary>
     ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
@@ -64,11 +54,15 @@ public class PgUnnestExpression : TableValuedFunctionExpression
     ///     doing so can result in application failures when updating to a new Entity Framework Core release.
     /// </summary>
     public PgUnnestExpression(string alias, SqlExpression array, string columnName, bool withOrdinality = true)
-        : base(alias, "unnest", schema: null, builtIn: true, new[] { array })
+        : base(alias, "unnest", new[] { array }, new[] { new ColumnInfo(columnName) }, withOrdinality)
     {
-        ColumnName = columnName;
-        WithOrdinality = withOrdinality;
     }
+
+    /// <inheritdoc />
+    protected override Expression VisitChildren(ExpressionVisitor visitor)
+        => visitor.Visit(Array) is var visitedArray && visitedArray == Array
+            ? this
+            : new PgUnnestExpression(Alias, (SqlExpression)visitedArray, ColumnName, WithOrdinality);
 
     /// <summary>
     ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
@@ -76,7 +70,7 @@ public class PgUnnestExpression : TableValuedFunctionExpression
     ///     any release. You should only use it directly in your code with extreme caution and knowing that
     ///     doing so can result in application failures when updating to a new Entity Framework Core release.
     /// </summary>
-    public override TableValuedFunctionExpression Update(IReadOnlyList<SqlExpression> arguments)
+    public override PgUnnestExpression Update(IReadOnlyList<SqlExpression> arguments)
         => arguments is [var singleArgument]
             ? Update(singleArgument)
             : throw new ArgumentException();
@@ -91,43 +85,4 @@ public class PgUnnestExpression : TableValuedFunctionExpression
         => array == Array
             ? this
             : new PgUnnestExpression(Alias, array, ColumnName, WithOrdinality);
-
-    /// <inheritdoc />
-    protected override void Print(ExpressionPrinter expressionPrinter)
-    {
-        expressionPrinter.Append(Name);
-        expressionPrinter.Append("(");
-        expressionPrinter.VisitCollection(Arguments);
-        expressionPrinter.Append(")");
-
-        if (WithOrdinality)
-        {
-            expressionPrinter.Append(" WITH ORDINALITY");
-        }
-
-        PrintAnnotations(expressionPrinter);
-
-        expressionPrinter
-            .Append(" AS ")
-            .Append(Alias)
-            .Append("(")
-            .Append(ColumnName)
-            .Append(")");
-    }
-
-    /// <inheritdoc />
-    public override bool Equals(object? obj)
-        => obj != null
-            && (ReferenceEquals(this, obj)
-                || obj is PgUnnestExpression unnestExpression
-                && Equals(unnestExpression));
-
-    private bool Equals(PgUnnestExpression unnestExpression)
-        => base.Equals(unnestExpression)
-            && ColumnName == unnestExpression.ColumnName
-            && WithOrdinality == unnestExpression.WithOrdinality;
-
-    /// <inheritdoc />
-    public override int GetHashCode()
-        => base.GetHashCode();
 }

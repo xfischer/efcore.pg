@@ -37,7 +37,7 @@ public class OperatorsQueryNpgsqlTest : OperatorsQueryTestBase
         await base.Or_on_two_nested_binaries_and_another_simple_comparison();
 
         AssertSql(
-"""
+            """
 SELECT o."Id" AS "Id1", o0."Id" AS "Id2", o1."Id" AS "Id3", o2."Id" AS "Id4", o3."Id" AS "Id5"
 FROM "OperatorEntityString" AS o
 CROSS JOIN "OperatorEntityString" AS o0
@@ -54,7 +54,7 @@ ORDER BY o."Id" NULLS FIRST, o0."Id" NULLS FIRST, o1."Id" NULLS FIRST, o2."Id" N
         await base.Projection_with_not_and_negation_on_integer();
 
         AssertSql(
-"""
+            """
 SELECT (~(-(-(o1."Value" + o."Value" + 2)))) % (-(o0."Value" + o0."Value") - o."Value")
 FROM "OperatorEntityLong" AS o
 CROSS JOIN "OperatorEntityLong" AS o0
@@ -68,7 +68,7 @@ ORDER BY o."Id" NULLS FIRST, o0."Id" NULLS FIRST, o1."Id" NULLS FIRST
         await base.Negate_on_column(async);
 
         AssertSql(
-"""
+            """
 SELECT o."Id"
 FROM "OperatorEntityInt" AS o
 WHERE o."Id" = -o."Value"
@@ -80,7 +80,7 @@ WHERE o."Id" = -o."Value"
         await base.Double_negate_on_column();
 
         AssertSql(
-"""
+            """
 SELECT o."Id"
 FROM "OperatorEntityInt" AS o
 WHERE -(-o."Value") = o."Value"
@@ -92,7 +92,7 @@ WHERE -(-o."Value") = o."Value"
         await base.Negate_on_binary_expression(async);
 
         AssertSql(
-"""
+            """
 SELECT o."Id" AS "Id1", o0."Id" AS "Id2"
 FROM "OperatorEntityInt" AS o
 CROSS JOIN "OperatorEntityInt" AS o0
@@ -105,15 +105,25 @@ WHERE -o."Value" = -(o."Id" + o0."Value")
         await base.Negate_on_like_expression(async);
 
         AssertSql(
-"""
+            """
 SELECT o."Id"
 FROM "OperatorEntityString" AS o
 WHERE o."Value" NOT LIKE 'A%' OR o."Value" IS NULL
 """);
     }
 
-    public override Task Concat_and_json_scalar(bool async)
-        => Assert.ThrowsAsync<InvalidOperationException>(() => base.Concat_and_json_scalar(async));
+    public override async Task Concat_and_json_scalar(bool async)
+    {
+        await base.Concat_and_json_scalar(async);
+
+        AssertSql(
+            """
+SELECT o."Id", o."Owned"
+FROM "Owner" AS o
+WHERE 'Foo' || (o."Owned" ->> 'SomeProperty') = 'FooBar'
+LIMIT 2
+""");
+    }
 
     protected override void Seed(OperatorsContext ctx)
     {

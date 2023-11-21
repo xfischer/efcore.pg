@@ -3,11 +3,12 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure.Internal;
 namespace Npgsql.EntityFrameworkCore.PostgreSQL.Query.Internal;
 
 /// <summary>
-/// The default factory for Npgsql-specific query SQL generators.
+///     The default factory for Npgsql-specific query SQL generators.
 /// </summary>
 public class NpgsqlQuerySqlGeneratorFactory : IQuerySqlGeneratorFactory
 {
     private readonly QuerySqlGeneratorDependencies _dependencies;
+    private readonly IRelationalTypeMappingSource _typeMappingSource;
     private readonly INpgsqlSingletonOptions _npgsqlSingletonOptions;
 
     /// <summary>
@@ -18,9 +19,11 @@ public class NpgsqlQuerySqlGeneratorFactory : IQuerySqlGeneratorFactory
     /// </summary>
     public NpgsqlQuerySqlGeneratorFactory(
         QuerySqlGeneratorDependencies dependencies,
+        IRelationalTypeMappingSource typeMappingSource,
         INpgsqlSingletonOptions npgsqlSingletonOptions)
     {
         _dependencies = dependencies;
+        _typeMappingSource = typeMappingSource;
         _npgsqlSingletonOptions = npgsqlSingletonOptions;
     }
 
@@ -33,6 +36,7 @@ public class NpgsqlQuerySqlGeneratorFactory : IQuerySqlGeneratorFactory
     public virtual QuerySqlGenerator Create()
         => new NpgsqlQuerySqlGenerator(
             _dependencies,
+            _typeMappingSource,
             _npgsqlSingletonOptions.ReverseNullOrderingEnabled,
             _npgsqlSingletonOptions.PostgresVersion);
 }
