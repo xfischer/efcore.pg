@@ -308,7 +308,7 @@ public class NpgsqlTypeMappingSourceTest
             new TypeMappingSourceDependencies(
                 new ValueConverterSelector(new ValueConverterSelectorDependencies()),
                 new JsonValueReaderWriterSource(new JsonValueReaderWriterSourceDependencies()),
-                Array.Empty<ITypeMappingSourcePlugin>()),
+                []),
             new RelationalTypeMappingSourceDependencies(
                 new IRelationalTypeMappingSourcePlugin[]
                 {
@@ -353,13 +353,9 @@ public class NpgsqlTypeMappingSourceTest
         }
     }
 
-    private class DummyType
-    {
-    }
+    private class DummyType;
 
-    private class UnknownType
-    {
-    }
+    private class UnknownType;
 
     protected IModel CreateEmptyModel()
         => CreateModelBuilder().Model.FinalizeModel();

@@ -1208,16 +1208,16 @@ WHERE @__interval_0 @> n."Instant"
             : query.Single();
 
         var start = Instant.FromUtc(2018, 4, 20, 10, 31, 33).Plus(Duration.FromMilliseconds(666));
-        Assert.Equal(new Interval[] { new(start, start + Duration.FromDays(5)) }, union);
+        Assert.Equal([new(start, start + Duration.FromDays(5))], union);
 
         AssertSql(
             """
-SELECT range_agg(t."Interval")
+SELECT range_agg(n0."Interval")
 FROM (
     SELECT n."Interval", TRUE AS "Key"
     FROM "NodaTimeTypes" AS n
-) AS t
-GROUP BY t."Key"
+) AS n0
+GROUP BY n0."Key"
 LIMIT 2
 """);
     }
@@ -1242,12 +1242,12 @@ LIMIT 2
 
         AssertSql(
             """
-SELECT range_intersect_agg(t."Interval")
+SELECT range_intersect_agg(n0."Interval")
 FROM (
     SELECT n."Interval", TRUE AS "Key"
     FROM "NodaTimeTypes" AS n
-) AS t
-GROUP BY t."Key"
+) AS n0
+GROUP BY n0."Key"
 LIMIT 2
 """);
     }
@@ -1300,7 +1300,22 @@ WHERE lower(n."DateInterval") = DATE '2018-04-20'
             """
 SELECT n."Id", n."DateInterval", n."Duration", n."Instant", n."InstantRange", n."Interval", n."LocalDate", n."LocalDate2", n."LocalDateRange", n."LocalDateTime", n."LocalTime", n."Long", n."OffsetTime", n."Period", n."TimeZoneId", n."ZonedDateTime"
 FROM "NodaTimeTypes" AS n
-WHERE upper(n."DateInterval") - INTERVAL 'P1D' = DATE '2018-04-24'
+WHERE CAST(upper(n."DateInterval") - INTERVAL 'P1D' AS date) = DATE '2018-04-24'
+""");
+    }
+
+    [ConditionalTheory]
+    [MemberData(nameof(IsAsyncData))]
+    public async Task DateInterval_End_Select(bool async)
+    {
+        await AssertQuery(
+            async,
+            ss => ss.Set<NodaTimeTypes>().Select(t => t.DateInterval.End));
+
+        AssertSql(
+            """
+SELECT CAST(upper(n."DateInterval") - INTERVAL 'P1D' AS date)
+FROM "NodaTimeTypes" AS n
 """);
     }
 
@@ -1401,16 +1416,16 @@ WHERE n."DateInterval" + @__dateInterval_0 = '[2018-04-20,2018-04-26]'::daterang
             ? await query.SingleAsync()
             : query.Single();
 
-        Assert.Equal(new DateInterval[] { new(new LocalDate(2018, 4, 20), new LocalDate(2018, 4, 24)) }, union);
+        Assert.Equal([new(new LocalDate(2018, 4, 20), new LocalDate(2018, 4, 24))], union);
 
         AssertSql(
             """
-SELECT range_agg(t."DateInterval")
+SELECT range_agg(n0."DateInterval")
 FROM (
     SELECT n."DateInterval", TRUE AS "Key"
     FROM "NodaTimeTypes" AS n
-) AS t
-GROUP BY t."Key"
+) AS n0
+GROUP BY n0."Key"
 LIMIT 2
 """);
     }
@@ -1434,12 +1449,12 @@ LIMIT 2
 
         AssertSql(
             """
-SELECT range_intersect_agg(t."DateInterval")
+SELECT range_intersect_agg(n0."DateInterval")
 FROM (
     SELECT n."DateInterval", TRUE AS "Key"
     FROM "NodaTimeTypes" AS n
-) AS t
-GROUP BY t."Key"
+) AS n0
+GROUP BY n0."Key"
 LIMIT 2
 """);
     }
@@ -1839,13 +1854,8 @@ LIMIT 1
     private void AssertSql(params string[] expected)
         => Fixture.TestSqlLoggerFactory.AssertBaseline(expected);
 
-    public class NodaTimeContext : PoolableDbContext
+    public class NodaTimeContext(DbContextOptions<NodaTimeContext> options) : PoolableDbContext(options)
     {
-        public NodaTimeContext(DbContextOptions<NodaTimeContext> options)
-            : base(options)
-        {
-        }
-
         // ReSharper disable once MemberHidesStaticFromOuterClass
         // ReSharper disable once UnusedAutoPropertyAccessor.Global
         public DbSet<NodaTimeTypes> NodaTimeTypes { get; set; }
@@ -1968,12 +1978,7 @@ LIMIT 1
 
     private class NodaTimeData : ISetSource
     {
-        private IReadOnlyList<NodaTimeTypes> NodaTimeTypes { get; }
-
-        public NodaTimeData()
-        {
-            NodaTimeTypes = CreateNodaTimeTypes();
-        }
+        private IReadOnlyList<NodaTimeTypes> NodaTimeTypes { get; } = CreateNodaTimeTypes();
 
         public IQueryable<TEntity> Set<TEntity>()
             where TEntity : class

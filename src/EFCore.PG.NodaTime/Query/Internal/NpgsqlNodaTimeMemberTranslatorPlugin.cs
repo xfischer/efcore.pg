@@ -100,7 +100,7 @@ public class NpgsqlNodaTimeMemberTranslator : IMemberTranslator
         _localDateTimeTypeMapping = typeMappingSource.FindMapping(typeof(LocalDateTime))!;
     }
 
-    private static readonly bool[][] TrueArrays = { Array.Empty<bool>(), new[] { true }, new[] { true, true } };
+    private static readonly bool[][] TrueArrays = [[], [true], [true, true]];
 
     /// <inheritdoc />
     public virtual SqlExpression? Translate(
@@ -251,10 +251,13 @@ public class NpgsqlNodaTimeMemberTranslator : IMemberTranslator
 
         if (member == DateInterval_End)
         {
-            return
+            // PostgreSQL creates a result of type 'timestamp without time zone' when subtracting intervals from dates, so add a cast back
+            // to date.
+            return _sqlExpressionFactory.Convert(
                 _sqlExpressionFactory.Subtract(
                     Upper(),
-                    _sqlExpressionFactory.Constant(Period.FromDays(1), _periodTypeMapping));
+                    _sqlExpressionFactory.Constant(Period.FromDays(1), _periodTypeMapping)), typeof(LocalDate),
+                _typeMappingSource.FindMapping(typeof(LocalDate)));
         }
 
         if (member == DateInterval_Length)

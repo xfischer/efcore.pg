@@ -1703,8 +1703,31 @@ DROP SEQUENCE "People_Id_old_seq";
             @"ALTER TABLE ""People"" ALTER COLUMN ""Name"" TYPE text COLLATE ""default"";");
     }
 
+    public override async Task Convert_string_column_to_a_json_column_containing_reference()
+    {
+        var exception =
+            await Assert.ThrowsAsync<PostgresException>(() => base.Convert_string_column_to_a_json_column_containing_reference());
+
+        Assert.Equal("42804", exception.SqlState); // column "Name" cannot be cast automatically to type jsonb
+    }
+
+    public override async Task Convert_string_column_to_a_json_column_containing_required_reference()
+    {
+        var exception =
+            await Assert.ThrowsAsync<PostgresException>(() => base.Convert_string_column_to_a_json_column_containing_required_reference());
+
+        Assert.Equal("42804", exception.SqlState); // column "Name" cannot be cast automatically to type jsonb
+    }
+
+    public override async Task Convert_string_column_to_a_json_column_containing_collection()
+    {
+        var exception =
+            await Assert.ThrowsAsync<PostgresException>(() => base.Convert_string_column_to_a_json_column_containing_collection());
+
+        Assert.Equal("42804", exception.SqlState); // column "Name" cannot be cast automatically to type jsonb
+    }
+
 #pragma warning disable CS0618
-    [Fact]
     public async Task Alter_column_change_default_column_collation()
     {
         await Test(
@@ -2235,9 +2258,56 @@ DROP SEQUENCE "People_Id_old_seq";
             @"CREATE INDEX ""IX_People_FirstName_LastName"" ON ""People"" (""FirstName"" text_pattern_ops, ""LastName"");");
     }
 
-    // Index collation: which collations are available on a given PostgreSQL varies (e.g. Linux vs. Windows),
-    // so we test support for this on the generated SQL only, in NpgsqlMigrationSqlGeneratorTest, and not against
-    // the database here.
+    [Fact]
+    public virtual async Task Create_index_with_collation()
+    {
+        await Test(
+            builder =>
+            {
+                builder.Entity("People", e => e.Property<string>("Name"));
+                builder.HasCollation("some_collation", locale: "POSIX", provider: "libc");
+            },
+            _ => { },
+            builder => builder.Entity("People").HasIndex("Name").UseCollation("some_collation"),
+            model =>
+            {
+                var table = Assert.Single(model.Tables);
+                var index = Assert.Single(table.Indexes);
+                Assert.Equal("some_collation", Assert.Single((IReadOnlyList<string>)index[RelationalAnnotationNames.Collation]!));
+            });
+
+        AssertSql(
+            """
+CREATE INDEX "IX_People_Name" ON "People" ("Name" COLLATE some_collation);
+""");
+    }
+
+    [Fact] // #3027
+    public virtual async Task Create_index_with_collation_and_operators()
+    {
+        await Test(
+            builder =>
+            {
+                builder.Entity("People", e => e.Property<string>("Name"));
+                builder.HasCollation("some_collation", locale: "POSIX", provider: "libc");
+            },
+            _ => { },
+            builder => builder.Entity("People").HasIndex("Name")
+                .UseCollation("some_collation")
+                .HasOperators("text_pattern_ops"),
+            model =>
+            {
+                var table = Assert.Single(model.Tables);
+                var index = Assert.Single(table.Indexes);
+                Assert.Equal("text_pattern_ops", Assert.Single((IReadOnlyList<string>)index[NpgsqlAnnotationNames.IndexOperators]!));
+                Assert.Equal("some_collation", Assert.Single((IReadOnlyList<string>)index[RelationalAnnotationNames.Collation]!));
+            });
+
+        AssertSql(
+            """
+CREATE INDEX "IX_People_Name" ON "People" ("Name" COLLATE some_collation text_pattern_ops);
+""");
+    }
 
     [Fact]
     public virtual async Task Create_index_with_null_sort_order()
@@ -2323,10 +2393,10 @@ DROP SEQUENCE "People_Id_old_seq";
             builder => builder.Entity(
                 "People", b =>
                 {
-                    b.HasIndex(new[] { "Age" }, "IX_NullsDistinct")
+                    b.HasIndex(["Age"], "IX_NullsDistinct")
                         .IsUnique();
 
-                    b.HasIndex(new[] { "Age" }, "IX_NullsNotDistinct")
+                    b.HasIndex(["Age"], "IX_NullsNotDistinct")
                         .IsUnique()
                         .AreNullsDistinct(false);
                 }),
@@ -2871,7 +2941,7 @@ END $EF$;",
     {
         await Test(
             _ => { },
-            builder => builder.HasPostgresEnum("Mood", new[] { "Happy", "Sad" }),
+            builder => builder.HasPostgresEnum("Mood", ["Happy", "Sad"]),
             model =>
             {
                 var moodEnum = Assert.Single(model.GetPostgresEnums());
@@ -2892,7 +2962,7 @@ END $EF$;",
     {
         await Test(
             _ => { },
-            builder => builder.HasPostgresEnum("some_schema", "Mood", new[] { "Happy", "Sad" }),
+            builder => builder.HasPostgresEnum("some_schema", "Mood", ["Happy", "Sad"]),
             model =>
             {
                 var moodEnum = Assert.Single(model.GetPostgresEnums());
@@ -2921,7 +2991,7 @@ END $EF$;
     public virtual async Task Drop_enum()
     {
         await Test(
-            builder => builder.HasPostgresEnum("Mood", new[] { "Happy", "Sad" }),
+            builder => builder.HasPostgresEnum("Mood", ["Happy", "Sad"]),
             _ => { },
             model => Assert.Empty(model.GetPostgresEnums()));
 
@@ -2933,9 +3003,9 @@ END $EF$;
     public virtual async Task Do_not_alter_existing_enum_when_creating_new_one()
     {
         await Test(
-            builder => builder.HasPostgresEnum("Enum1", new[] { "A", "B" }),
+            builder => builder.HasPostgresEnum("Enum1", ["A", "B"]),
             _ => { },
-            builder => builder.HasPostgresEnum("Enum2", new[] { "X", "Y" }),
+            builder => builder.HasPostgresEnum("Enum2", ["X", "Y"]),
             model => Assert.Equal(2, model.GetPostgresEnums().Count()));
 
         AssertSql(
@@ -2946,8 +3016,8 @@ END $EF$;
     public virtual async Task Alter_enum_add_label_at_end()
     {
         await Test(
-            builder => builder.HasPostgresEnum("Mood", new[] { "Happy", "Sad" }),
-            builder => builder.HasPostgresEnum("Mood", new[] { "Happy", "Sad", "Angry" }),
+            builder => builder.HasPostgresEnum("Mood", ["Happy", "Sad"]),
+            builder => builder.HasPostgresEnum("Mood", ["Happy", "Sad", "Angry"]),
             model =>
             {
                 var moodEnum = Assert.Single(model.GetPostgresEnums());
@@ -2966,8 +3036,8 @@ END $EF$;
     public virtual async Task Alter_enum_add_label_in_middle()
     {
         await Test(
-            builder => builder.HasPostgresEnum("Mood", new[] { "Happy", "Sad" }),
-            builder => builder.HasPostgresEnum("Mood", new[] { "Happy", "Angry", "Sad" }),
+            builder => builder.HasPostgresEnum("Mood", ["Happy", "Sad"]),
+            builder => builder.HasPostgresEnum("Mood", ["Happy", "Angry", "Sad"]),
             model =>
             {
                 var moodEnum = Assert.Single(model.GetPostgresEnums());
@@ -2985,14 +3055,14 @@ END $EF$;
     [Fact]
     public virtual Task Alter_enum_drop_label_not_supported()
         => TestThrows<NotSupportedException>(
-            builder => builder.HasPostgresEnum("Mood", new[] { "Happy", "Sad" }),
-            builder => builder.HasPostgresEnum("Mood", new[] { "Happy" }));
+            builder => builder.HasPostgresEnum("Mood", ["Happy", "Sad"]),
+            builder => builder.HasPostgresEnum("Mood", ["Happy"]));
 
     [Fact]
     public virtual Task Alter_enum_change_label_not_supported()
         => TestThrows<NotSupportedException>(
-            builder => builder.HasPostgresEnum("Mood", new[] { "Happy", "Sad" }),
-            builder => builder.HasPostgresEnum("Mood", new[] { "Happy", "Angry" }));
+            builder => builder.HasPostgresEnum("Mood", ["Happy", "Sad"]),
+            builder => builder.HasPostgresEnum("Mood", ["Happy", "Angry"]));
 
     #endregion
 
@@ -3223,5 +3293,5 @@ CREATE COLLATION some_collation (LOCALE = 'en-u-ks-level1',
     protected override ICollection<BuildReference> GetAdditionalReferences()
         => AdditionalReferences;
 
-    private static readonly BuildReference[] AdditionalReferences = { BuildReference.ByName("Npgsql") };
+    private static readonly BuildReference[] AdditionalReferences = [BuildReference.ByName("Npgsql")];
 }

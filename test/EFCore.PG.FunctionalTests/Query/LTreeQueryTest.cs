@@ -502,14 +502,9 @@ WHERE lca(ARRAY[l."LTree",'Top.Hobbies']::ltree[]) = 'Top'
     private void AssertSql(params string[] expected)
         => Fixture.TestSqlLoggerFactory.AssertBaseline(expected);
 
-    public class LTreeQueryContext : PoolableDbContext
+    public class LTreeQueryContext(DbContextOptions options) : PoolableDbContext(options)
     {
         public DbSet<LTreeEntity> LTreeEntities { get; set; }
-
-        public LTreeQueryContext(DbContextOptions options)
-            : base(options)
-        {
-        }
 
         public static void Seed(LTreeQueryContext context)
         {
@@ -528,7 +523,7 @@ WHERE lca(ARRAY[l."LTree",'Top.Hobbies']::ltree[]) = 'Top'
             {
                 ltreeEntity.LTreeAsString = ltreeEntity.LTree;
                 ltreeEntity.SomeString = "*.Astrophysics";
-                ltreeEntity.LTrees = new LTree[] { ltreeEntity.LTree, "Foo" };
+                ltreeEntity.LTrees = [ltreeEntity.LTree, "Foo"];
             }
 
             context.LTreeEntities.AddRange(ltreeEntities);

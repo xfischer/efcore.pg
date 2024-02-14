@@ -151,7 +151,7 @@ public class NpgsqlSqlExpressionFactory : SqlExpressionFactory
         bool returnsText,
         Type type,
         RelationalTypeMapping? typeMapping = null)
-        => JsonTraversal(expression, Array.Empty<SqlExpression>(), returnsText, type, typeMapping);
+        => JsonTraversal(expression, [], returnsText, type, typeMapping);
 
     /// <summary>
     ///     Creates a new <see cref="PgJsonTraversalExpression" />, for traversing inside a JSON document.
@@ -198,7 +198,7 @@ public class NpgsqlSqlExpressionFactory : SqlExpressionFactory
             var addMethod = type.GetMethod("Add")!;
             for (var i = 0; i < elements.Count; i++)
             {
-                addMethod.Invoke(list, new[] { ((SqlConstantExpression)newArrayExpression.Expressions[i]).Value });
+                addMethod.Invoke(list, [((SqlConstantExpression)newArrayExpression.Expressions[i]).Value]);
             }
 
             return Constant(list, newArrayExpression.TypeMapping);
@@ -871,8 +871,6 @@ public class NpgsqlSqlExpressionFactory : SqlExpressionFactory
                 // (e.g. IP address containment)
                 containerMapping = _typeMappingSource.FindContainerMapping(container.Type, containeeMapping, Dependencies.Model);
 
-                // containerMapping = _typeMappingSource.FindContainerMapping(container.Type, containeeMapping);
-
                 // Apply the inferred mapping to the container, or fall back to the default type mapping
                 if (containerMapping is not null)
                 {
@@ -1009,7 +1007,7 @@ public class NpgsqlSqlExpressionFactory : SqlExpressionFactory
             var newExpression = ApplyTypeMapping(expression, elementTypeMapping);
             if (newExpression != expression && newExpressions is null)
             {
-                newExpressions = new List<SqlExpression>();
+                newExpressions = [];
                 for (var j = 0; j < i; j++)
                 {
                     newExpressions.Add(pgNewArrayExpression.Expressions[j]);

@@ -9,12 +9,7 @@ namespace Npgsql.EntityFrameworkCore.PostgreSQL.TestUtilities;
 
 public class NpgsqlDatabaseCleaner : RelationalDatabaseCleaner
 {
-    private readonly NpgsqlSqlGenerationHelper _sqlGenerationHelper;
-
-    public NpgsqlDatabaseCleaner()
-    {
-        _sqlGenerationHelper = new NpgsqlSqlGenerationHelper(new RelationalSqlGenerationHelperDependencies());
-    }
+    private readonly NpgsqlSqlGenerationHelper _sqlGenerationHelper = new(new RelationalSqlGenerationHelperDependencies());
 
     protected override IDatabaseModelFactory CreateDatabaseModelFactory(ILoggerFactory loggerFactory)
         => new NpgsqlDatabaseModelFactory(
@@ -139,11 +134,13 @@ WHERE
             return;
         }
 
-        const string getUserCollations = @"SELECT nspname, collname
+        const string getUserCollations =
+            """
+SELECT nspname, collname
 FROM pg_collation coll
     JOIN pg_namespace ns ON ns.oid=coll.collnamespace
-    JOIN pg_authid auth ON auth.oid = coll.collowner WHERE rolname <> 'postgres';
-";
+    JOIN pg_authid auth ON auth.oid = coll.collowner WHERE nspname <> 'pg_catalog';
+""";
 
         (string Schema, string Name)[] userDefinedTypes;
         using (var cmd = new NpgsqlCommand(getUserCollations, conn))

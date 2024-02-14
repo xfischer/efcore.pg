@@ -1951,7 +1951,7 @@ public class NpgsqlMigrationsSqlGenerator : MigrationsSqlGenerator
     /// <remarks>
     ///     https://www.postgresql.org/docs/current/static/ddl-system-columns.html
     /// </remarks>
-    private static readonly string[] SystemColumnNames = { "tableoid", "xmin", "cmin", "xmax", "cmax", "ctid" };
+    private static readonly string[] SystemColumnNames = ["tableoid", "xmin", "cmin", "xmax", "cmax", "ctid"];
 
     #endregion System column utilities
 
@@ -2051,19 +2051,23 @@ public class NpgsqlMigrationsSqlGenerator : MigrationsSqlGenerator
 
     private string IndexColumnList(IndexColumn[] columns, string? method)
     {
-        var isFirst = true;
         var builder = new StringBuilder();
 
         for (var i = 0; i < columns.Length; i++)
         {
-            if (!isFirst)
+            var column = columns[i];
+
+            if (i > 0)
             {
                 builder.Append(", ");
             }
 
-            var column = columns[i];
-
             builder.Append(DelimitIdentifier(column.Name));
+
+            if (!string.IsNullOrEmpty(column.Collation))
+            {
+                builder.Append(" COLLATE ").Append(DelimitIdentifier(column.Collation));
+            }
 
             if (!string.IsNullOrEmpty(column.Operator))
             {
@@ -2072,11 +2076,6 @@ public class NpgsqlMigrationsSqlGenerator : MigrationsSqlGenerator
                     : DelimitIdentifier(column.Operator);
 
                 builder.Append(" ").Append(delimitedOperator);
-            }
-
-            if (!string.IsNullOrEmpty(column.Collation))
-            {
-                builder.Append(" COLLATE ").Append(DelimitIdentifier(column.Collation));
             }
 
             // Of the built-in access methods, only btree (the default) supports
@@ -2105,8 +2104,6 @@ public class NpgsqlMigrationsSqlGenerator : MigrationsSqlGenerator
                     }
                 }
             }
-
-            isFirst = false;
         }
 
         return builder.ToString();
@@ -2220,22 +2217,13 @@ public class NpgsqlMigrationsSqlGenerator : MigrationsSqlGenerator
         return columns;
     }
 
-    private readonly struct IndexColumn
+    private readonly struct IndexColumn(string name, string? @operator, string? collation, bool isDescending, NullSortOrder nullSortOrder)
     {
-        public IndexColumn(string name, string? @operator, string? collation, bool isDescending, NullSortOrder nullSortOrder)
-        {
-            Name = name;
-            Operator = @operator;
-            Collation = collation;
-            IsDescending = isDescending;
-            NullSortOrder = nullSortOrder;
-        }
-
-        public string Name { get; }
-        public string? Operator { get; }
-        public string? Collation { get; }
-        public bool IsDescending { get; }
-        public NullSortOrder NullSortOrder { get; }
+        public string Name { get; } = name;
+        public string? Operator { get; } = @operator;
+        public string? Collation { get; } = collation;
+        public bool IsDescending { get; } = isDescending;
+        public NullSortOrder NullSortOrder { get; } = nullSortOrder;
     }
 
     #endregion
