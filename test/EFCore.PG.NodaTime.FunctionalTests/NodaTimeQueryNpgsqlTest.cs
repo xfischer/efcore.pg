@@ -1,5 +1,6 @@
 ﻿using Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure;
 using Npgsql.EntityFrameworkCore.PostgreSQL.TestUtilities;
+using Xunit.Sdk;
 
 namespace Npgsql.EntityFrameworkCore.PostgreSQL;
 
@@ -357,7 +358,8 @@ WHERE n."LocalDateTime" AT TIME ZONE 'Europe/Berlin' = @__ToInstant_0
             async,
             ss => ss.Set<NodaTimeTypes>().Where(
                 t => t.LocalDateTime.InZoneLeniently(DateTimeZoneProviders.Tzdb[t.TimeZoneId]).ToInstant()
-                    == new ZonedDateTime(new LocalDateTime(2018, 4, 20, 8, 31, 33, 666), DateTimeZone.Utc, Offset.Zero).ToInstant()));
+                    == new ZonedDateTime(
+                        new LocalDateTime(2018, 4, 20, 8, 31, 33, 666), DateTimeZone.Utc, Offset.Zero).ToInstant()));
 
         AssertSql(
             """
@@ -1817,12 +1819,12 @@ WHERE n."ZonedDateTime" = @__ToInstant_0
     public async Task ZonedDateTime_Distance()
     {
         await using var context = CreateContext();
+
         var closest = await context.NodaTimeTypes
             .OrderBy(
                 t => EF.Functions.Distance(
                     t.ZonedDateTime,
                     new ZonedDateTime(new LocalDateTime(2018, 4, 1, 0, 0, 0), DateTimeZone.Utc, Offset.Zero))).FirstAsync();
-
         Assert.Equal(1, closest.Id);
 
         AssertSql(

@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure.Internal;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Query.Expressions;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Query.Expressions.Internal;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal;
@@ -18,8 +19,8 @@ public class NpgsqlQueryableMethodTranslatingExpressionVisitor : RelationalQuery
     private readonly RelationalQueryCompilationContext _queryCompilationContext;
     private readonly NpgsqlTypeMappingSource _typeMappingSource;
     private readonly NpgsqlSqlExpressionFactory _sqlExpressionFactory;
+    private readonly bool _isRedshift;
     private RelationalTypeMapping? _ordinalityTypeMapping;
-
 
     #region MethodInfos
 
@@ -46,12 +47,14 @@ public class NpgsqlQueryableMethodTranslatingExpressionVisitor : RelationalQuery
     public NpgsqlQueryableMethodTranslatingExpressionVisitor(
         QueryableMethodTranslatingExpressionVisitorDependencies dependencies,
         RelationalQueryableMethodTranslatingExpressionVisitorDependencies relationalDependencies,
-        RelationalQueryCompilationContext queryCompilationContext)
+        RelationalQueryCompilationContext queryCompilationContext,
+        INpgsqlSingletonOptions npgsqlSingletonOptions)
         : base(dependencies, relationalDependencies, queryCompilationContext)
     {
         _queryCompilationContext = queryCompilationContext;
         _typeMappingSource = (NpgsqlTypeMappingSource)relationalDependencies.TypeMappingSource;
         _sqlExpressionFactory = (NpgsqlSqlExpressionFactory)relationalDependencies.SqlExpressionFactory;
+        _isRedshift = npgsqlSingletonOptions.UseRedshift;
     }
 
     /// <summary>
@@ -66,6 +69,7 @@ public class NpgsqlQueryableMethodTranslatingExpressionVisitor : RelationalQuery
         _queryCompilationContext = parentVisitor._queryCompilationContext;
         _typeMappingSource = parentVisitor._typeMappingSource;
         _sqlExpressionFactory = parentVisitor._sqlExpressionFactory;
+        _isRedshift = parentVisitor._isRedshift;
     }
 
     /// <summary>
@@ -83,11 +87,18 @@ public class NpgsqlQueryableMethodTranslatingExpressionVisitor : RelationalQuery
     ///     any release. You should only use it directly in your code with extreme caution and knowing that
     ///     doing so can result in application failures when updating to a new Entity Framework Core release.
     /// </summary>
-    protected override ShapedQueryExpression TranslatePrimitiveCollection(
+    protected override ShapedQueryExpression? TranslatePrimitiveCollection(
         SqlExpression sqlExpression,
         IProperty? property,
         string tableAlias)
     {
+        if (_isRedshift)
+        {
+            AddTranslationErrorDetails("Redshift does not support unnest, which is required for most forms of querying of JSON arrays.");
+
+            return null;
+        }
+
         var elementClrType = sqlExpression.Type.GetSequenceType();
         var elementTypeMapping = (RelationalTypeMapping?)sqlExpression.TypeMapping?.ElementTypeMapping;
 
@@ -254,18 +265,6 @@ public class NpgsqlQueryableMethodTranslatingExpressionVisitor : RelationalQuery
             => entityType.GetAllBaseTypes().Concat(entityType.GetDerivedTypesInclusive())
                 .SelectMany(t => t.GetDeclaredNavigations());
     }
-
-    /// <summary>
-    ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
-    ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
-    ///     any release. You should only use it directly in your code with extreme caution and knowing that
-    ///     doing so can result in application failures when updating to a new Entity Framework Core release.
-    /// </summary>
-    protected override Expression ApplyInferredTypeMappings(
-        Expression expression,
-        IReadOnlyDictionary<(string, string), RelationalTypeMapping?> inferredTypeMappings)
-        => new NpgsqlInferredTypeMappingApplier(
-            RelationalDependencies.Model, _typeMappingSource, _sqlExpressionFactory, inferredTypeMappings).Visit(expression);
 
     /// <summary>
     ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
@@ -1297,64 +1296,6 @@ public class NpgsqlQueryableMethodTranslatingExpressionVisitor : RelationalQuery
             }
 
             return base.Visit(expression);
-        }
-    }
-
-    /// <summary>
-    ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
-    ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
-    ///     any release. You should only use it directly in your code with extreme caution and knowing that
-    ///     doing so can result in application failures when updating to a new Entity Framework Core release.
-    /// </summary>
-    protected class NpgsqlInferredTypeMappingApplier : RelationalInferredTypeMappingApplier
-    {
-        private readonly NpgsqlTypeMappingSource _typeMappingSource;
-        private readonly NpgsqlSqlExpressionFactory _sqlExpressionFactory;
-
-        /// <summary>
-        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
-        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
-        ///     any release. You should only use it directly in your code with extreme caution and knowing that
-        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
-        /// </summary>
-        public NpgsqlInferredTypeMappingApplier(
-            IModel model,
-            NpgsqlTypeMappingSource typeMappingSource,
-            NpgsqlSqlExpressionFactory sqlExpressionFactory,
-            IReadOnlyDictionary<(string, string), RelationalTypeMapping?> inferredTypeMappings)
-            : base(model, sqlExpressionFactory, inferredTypeMappings)
-        {
-            _typeMappingSource = typeMappingSource;
-            _sqlExpressionFactory = sqlExpressionFactory;
-        }
-
-        /// <summary>
-        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
-        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
-        ///     any release. You should only use it directly in your code with extreme caution and knowing that
-        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
-        /// </summary>
-        protected override Expression VisitExtension(Expression expression)
-        {
-            switch (expression)
-            {
-                case PgUnnestExpression unnestExpression
-                    when TryGetInferredTypeMapping(unnestExpression.Alias, unnestExpression.ColumnName, out var elementTypeMapping):
-                {
-                    var collectionTypeMapping = _typeMappingSource.FindMapping(unnestExpression.Array.Type, Model, elementTypeMapping);
-
-                    if (collectionTypeMapping is null)
-                    {
-                        throw new InvalidOperationException(RelationalStrings.NullTypeMappingInSqlTree(expression.Print()));
-                    }
-
-                    return unnestExpression.Update(
-                        _sqlExpressionFactory.ApplyTypeMapping(unnestExpression.Array, collectionTypeMapping));
-                }
-
-                default:
-                    return base.VisitExtension(expression);
-            }
         }
     }
 }
