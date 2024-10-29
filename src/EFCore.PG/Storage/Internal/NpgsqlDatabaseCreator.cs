@@ -170,16 +170,15 @@ WHERE
         var designTimeModel = Dependencies.CurrentContext.Context.GetService<IDesignTimeModel>().Model;
 
         return Dependencies.MigrationsSqlGenerator.Generate(
-            new[]
-            {
-                new NpgsqlCreateDatabaseOperation
+        [
+            new NpgsqlCreateDatabaseOperation
                 {
                     Name = _connection.DbConnection.Database,
                     Template = designTimeModel.GetDatabaseTemplate(),
                     Collation = designTimeModel.GetCollation(),
                     Tablespace = designTimeModel.GetTablespace()
                 }
-            });
+        ]);
     }
 
     /// <summary>
@@ -209,7 +208,9 @@ WHERE
         var unpooledCsb = new NpgsqlConnectionStringBuilder(_connection.ConnectionString) { Pooling = false, Multiplexing = false };
 
         using var _ = new TransactionScope(TransactionScopeOption.Suppress, TransactionScopeAsyncFlowOption.Enabled);
-        var unpooledRelationalConnection = _connection.CloneWith(unpooledCsb.ToString());
+        var unpooledRelationalConnection =
+            await _connection.CloneWith(unpooledCsb.ToString(), async, cancellationToken).ConfigureAwait(false);
+
         try
         {
             if (async)
@@ -272,7 +273,15 @@ WHERE
     /// </summary>
     public override void Delete()
     {
-        ClearAllPools();
+        switch (_connection.DataSource)
+        {
+            case NpgsqlDataSource dataSource:
+                dataSource.Clear();
+                break;
+            case null:
+                ClearAllPools();
+                break;
+        }
 
         using (var masterConnection = _connection.CreateAdminConnection())
         {
@@ -289,7 +298,16 @@ WHERE
     /// </summary>
     public override async Task DeleteAsync(CancellationToken cancellationToken = default)
     {
-        ClearAllPools();
+        switch (_connection.DataSource)
+        {
+            case NpgsqlDataSource dataSource:
+                // TODO: Do this asynchronously once https://github.com/npgsql/npgsql/issues/4499 is done
+                dataSource.Clear();
+                break;
+            case null:
+                ClearAllPools();
+                break;
+        }
 
         var masterConnection = _connection.CreateAdminConnection();
         await using (masterConnection)

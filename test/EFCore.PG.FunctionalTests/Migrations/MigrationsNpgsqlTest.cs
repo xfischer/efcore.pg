@@ -62,7 +62,7 @@ COMMENT ON TABLE dbo2."People" IS 'Table comment';
 COMMENT ON COLUMN dbo2."People"."EmployerId" IS 'Employer ID comment';
 """,
             //
-            @"CREATE INDEX ""IX_People_EmployerId"" ON dbo2.""People"" (""EmployerId"");");
+            """CREATE INDEX "IX_People_EmployerId" ON dbo2."People" ("EmployerId");""");
     }
 
     public override async Task Create_table_no_key()
@@ -531,7 +531,7 @@ BEGIN
 END $EF$;
 """,
             //
-            @"ALTER TABLE ""TestTable"" SET SCHEMA ""TestTableSchema"";");
+            """ALTER TABLE "TestTable" SET SCHEMA "TestTableSchema";""");
     }
 
     #endregion
@@ -1194,7 +1194,9 @@ ALTER TABLE "People" ALTER COLUMN "FirstName" SET DEFAULT '';
                     e.Property<int>("Y");
                 }),
             builder => builder.Entity("People").Property<int>("Sum")
-                .HasComputedColumnSql(@"""X"" + ""Y""", stored: true),
+                .HasComputedColumnSql("""
+                    "X" + "Y"
+                    """, stored: true),
             builder => builder.Entity("People").Property<int>("Sum"),
             model =>
             {
@@ -1740,7 +1742,9 @@ DROP SEQUENCE "People_Id_old_seq";
                 "People", b =>
                 {
                     b.Property<string>("Name");
-                    b.Property<string>("Name2").HasComputedColumnSql(@"""Name""", stored: true);
+                    b.Property<string>("Name2").HasComputedColumnSql("""
+                        "Name"
+                        """, stored: true);
                 }),
             _ => { },
             builder => builder.Entity("People").Property<string>("Name2")
@@ -1748,7 +1752,9 @@ DROP SEQUENCE "People_Id_old_seq";
             model =>
             {
                 var computedColumn = Assert.Single(Assert.Single(model.Tables).Columns, c => c.Name == "Name2");
-                Assert.Equal(@"""Name""", computedColumn.ComputedColumnSql);
+                Assert.Equal("""
+                    "Name"
+                    """, computedColumn.ComputedColumnSql);
                 Assert.Equal(NonDefaultCollation, computedColumn.Collation);
             });
 
@@ -2031,12 +2037,14 @@ DROP SEQUENCE "People_Id_old_seq";
             _ => { },
             builder => builder.Entity("People").HasIndex("Name")
                 .IncludeProperties("FirstName", "LastName")
-                .HasFilter(@"""Name"" IS NOT NULL"),
+                .HasFilter("""
+                    "Name" IS NOT NULL
+                    """),
             model =>
             {
                 var table = Assert.Single(model.Tables);
                 var index = Assert.Single(table.Indexes);
-                Assert.Equal(@"(""Name"" IS NOT NULL)", index.Filter);
+                Assert.Equal("""("Name" IS NOT NULL)""", index.Filter);
                 Assert.Single(index.Columns);
                 Assert.Contains(table.Columns.Single(c => c.Name == "Name"), index.Columns);
 
@@ -2122,13 +2130,15 @@ DROP SEQUENCE "People_Id_old_seq";
             builder => builder.Entity("People").HasIndex("Name")
                 .IsUnique()
                 .IncludeProperties("FirstName", "LastName")
-                .HasFilter(@"""Name"" IS NOT NULL"),
+                .HasFilter("""
+                    "Name" IS NOT NULL
+                    """),
             model =>
             {
                 var table = Assert.Single(model.Tables);
                 var index = Assert.Single(table.Indexes);
                 Assert.True(index.IsUnique);
-                Assert.Equal(@"(""Name"" IS NOT NULL)", index.Filter);
+                Assert.Equal("""("Name" IS NOT NULL)""", index.Filter);
                 Assert.Single(index.Columns);
                 Assert.Contains(table.Columns.Single(c => c.Name == "Name"), index.Columns);
 
@@ -2575,40 +2585,8 @@ END $EF$;
 """,
             //
             """
-CREATE SEQUENCE dbo2."TestSequence" START WITH 3 INCREMENT BY 2 MINVALUE 2 MAXVALUE 916 CYCLE CACHE 20;
+CREATE SEQUENCE dbo2."TestSequence" START WITH 3 INCREMENT BY 2 MINVALUE 2 MAXVALUE 916 CYCLE;
 """);
-    }
-
-    public override async Task Create_sequence_nocache()
-    {
-        await base.Create_sequence_nocache();
-
-        AssertSql("""CREATE SEQUENCE "Alpha" START WITH 1 INCREMENT BY 1 NO CYCLE CACHE 1;""");
-    }
-
-    public override async Task Create_sequence_cache()
-    {
-        await base.Create_sequence_cache();
-
-        AssertSql("""CREATE SEQUENCE "Beta" START WITH 1 INCREMENT BY 1 NO CYCLE CACHE 20;""");
-    }
-
-    public override async Task Create_sequence_default_cache()
-    {
-        // PG has no distinction between "no cached" and "CACHE 1" (which is the default), so setting to the default is the same as
-        // disabling caching.
-        await Test(
-            builder => { },
-            builder => builder.HasSequence("Gamma").UseCache(),
-            model =>
-            {
-                var sequence = Assert.Single(model.Sequences);
-                Assert.Equal("Gamma", sequence.Name);
-                Assert.False(sequence.IsCached);
-                Assert.Null(sequence.CacheSize);
-            });
-
-        AssertSql("""CREATE SEQUENCE "Gamma" START WITH 1 INCREMENT BY 1 NO CYCLE;""");
     }
 
     [Fact]
@@ -2634,7 +2612,7 @@ CREATE SEQUENCE dbo2."TestSequence" START WITH 3 INCREMENT BY 2 MINVALUE 2 MAXVA
 
         AssertSql(
             """
-ALTER SEQUENCE foo INCREMENT BY 2 MINVALUE -5 MAXVALUE 10 CYCLE CACHE 20;
+ALTER SEQUENCE foo INCREMENT BY 2 MINVALUE -5 MAXVALUE 10 CYCLE;
 """,
             //
             """
@@ -2647,71 +2625,10 @@ ALTER SEQUENCE foo RESTART;
     {
         await base.Alter_sequence_increment_by();
 
-        AssertSql("ALTER SEQUENCE foo INCREMENT BY 2 NO MINVALUE NO MAXVALUE NO CYCLE CACHE 1;");
-    }
-
-    public override async Task Alter_sequence_default_cache_to_cache()
-    {
-        await base.Alter_sequence_default_cache_to_cache();
-
-        AssertSql("""ALTER SEQUENCE "Delta" INCREMENT BY 1 NO MINVALUE NO MAXVALUE NO CYCLE CACHE 20;""");
-    }
-
-    public override async Task Alter_sequence_default_cache_to_nocache()
-    {
-        await base.Alter_sequence_default_cache_to_nocache();
-
-        AssertSql("""ALTER SEQUENCE "Epsilon" INCREMENT BY 1 NO MINVALUE NO MAXVALUE NO CYCLE CACHE 1;""");
-    }
-
-    public override async Task Alter_sequence_cache_to_nocache()
-    {
-        await base.Alter_sequence_cache_to_nocache();
-
-        AssertSql("""ALTER SEQUENCE "Zeta" INCREMENT BY 1 NO MINVALUE NO MAXVALUE NO CYCLE CACHE 1;""");
-    }
-
-    public override async Task Alter_sequence_cache_to_default_cache()
-    {
-        // PG has no distinction between "no cached" and "CACHE 1" (which is the default), so setting to the default is the same as
-        // disabling caching.
-        await Test(
-            builder => builder.HasSequence<int>("Eta").UseCache(20),
-            builder => { },
-            builder => builder.HasSequence<int>("Eta").UseCache(),
-            model =>
-            {
-                var sequence = Assert.Single(model.Sequences);
-                Assert.False(sequence.IsCached);
-                Assert.Null(sequence.CacheSize);
-            });
-
-        AssertSql("""ALTER SEQUENCE "Eta" INCREMENT BY 1 NO MINVALUE NO MAXVALUE NO CYCLE CACHE 1;""");
-    }
-
-    public override async Task Alter_sequence_nocache_to_cache()
-    {
-        await base.Alter_sequence_nocache_to_cache();
-
-        AssertSql("""ALTER SEQUENCE "Theta" INCREMENT BY 1 NO MINVALUE NO MAXVALUE NO CYCLE CACHE 20;""");
-    }
-
-    public override async Task Alter_sequence_nocache_to_default_cache()
-    {
-        // PG has no distinction between "no cached" and "CACHE 1" (which is the default), so setting to the default is the same as
-        // disabling caching.
-        await Test(
-            builder => builder.HasSequence<int>("Iota").UseNoCache(),
-            builder => { },
-            builder => builder.HasSequence<int>("Iota").UseCache(),
-            model =>
-            {
-                var sequence = Assert.Single(model.Sequences);
-                Assert.False(sequence.IsCached);
-                Assert.Null(sequence.CacheSize);
-            });
-
-        AssertSql("""ALTER SEQUENCE "Iota" INCREMENT BY 1 NO MINVALUE NO MAXVALUE NO CYCLE CACHE 1;""");
+        AssertSql(
+            """
+ALTER SEQUENCE foo INCREMENT BY 2 NO MINVALUE NO MAXVALUE NO CYCLE;
+""");
     }
 
     public override async Task Alter_sequence_restart_with()
@@ -2951,12 +2868,14 @@ SELECT setval(
             });
 
         AssertSql(
-            @"DO $EF$
-BEGIN
-    IF NOT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname = 'some_schema') THEN
-        CREATE SCHEMA some_schema;
-    END IF;
-END $EF$;",
+            """
+                DO $EF$
+                BEGIN
+                    IF NOT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname = 'some_schema') THEN
+                        CREATE SCHEMA some_schema;
+                    END IF;
+                END $EF$;
+                """,
             //
             @"CREATE EXTENSION IF NOT EXISTS citext SCHEMA some_schema;");
     }
@@ -3269,7 +3188,7 @@ CREATE COLLATION some_collation (LOCALE = 'en-u-ks-level1',
                 var column = Assert.Single(table.Columns, c => c.Name == "TsVector");
                 Assert.Equal("tsvector", column.StoreType);
                 Assert.Equal(
-                    @"to_tsvector('english'::regconfig, ((""Title"" || ' '::text) || COALESCE(""Description"", ''::text)))",
+                    """to_tsvector('english'::regconfig, (("Title" || ' '::text) || COALESCE("Description", ''::text)))""",
                     column.ComputedColumnSql);
             });
 

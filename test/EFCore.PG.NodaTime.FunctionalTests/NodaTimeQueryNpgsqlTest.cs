@@ -1,6 +1,5 @@
 ﻿using Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure;
 using Npgsql.EntityFrameworkCore.PostgreSQL.TestUtilities;
-using Xunit.Sdk;
 
 namespace Npgsql.EntityFrameworkCore.PostgreSQL;
 
@@ -1904,18 +1903,13 @@ LIMIT 1
         protected override string StoreName
             => "NodaTimeTest";
 
-#pragma warning disable CS0618 // GlobalTypeMapper is obsolete
-        public NodaTimeQueryNpgsqlFixture()
-        {
-            NpgsqlConnection.GlobalTypeMapper.UseNodaTime();
-        }
-#pragma warning restore CS0618
-
         // Set the PostgreSQL TimeZone parameter to something local, to ensure that operations which take TimeZone into account
         // don't depend on the database's time zone, and also that operations which shouldn't take TimeZone into account indeed
         // don't.
+        // We also instruct the test store to pass a connection string to UseNpgsql() instead of a DbConnection - that's required to allow
+        // EF's UseNodaTime() to function properly and instantiate an NpgsqlDataSource internally.
         protected override ITestStoreFactory TestStoreFactory
-            => NpgsqlTestStoreFactory.WithConnectionStringOptions("-c TimeZone=Europe/Berlin");
+            => new NpgsqlTestStoreFactory(connectionStringOptions: "-c TimeZone=Europe/Berlin", useConnectionString: true);
 
         public TestSqlLoggerFactory TestSqlLoggerFactory
             => (TestSqlLoggerFactory)ListLoggerFactory;
