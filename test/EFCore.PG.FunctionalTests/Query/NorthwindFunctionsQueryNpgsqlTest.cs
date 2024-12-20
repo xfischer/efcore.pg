@@ -53,11 +53,11 @@ WHERE c."Region" IS NULL OR btrim(c."Region", E' \t\n\r') = ''
 
         AssertSql(
             """
-@__foo_0='foo'
+@foo='foo'
 
 SELECT c."CustomerID", c."Address", c."City", c."CompanyName", c."ContactName", c."ContactTitle", c."Country", c."Fax", c."Phone", c."PostalCode", c."Region"
 FROM "Customers" AS c
-WHERE concat_ws('|', c."CompanyName", @__foo_0, '', 'bar') = 'Around the Horn|foo||bar'
+WHERE concat_ws('|', c."CompanyName", @foo, '', 'bar') = 'Around the Horn|foo||bar'
 """);
     }
 
@@ -140,11 +140,11 @@ WHERE c."CompanyName" ~ '(?p)^A'';foo'
 
         AssertSql(
             """
-@__pattern_0='^A'
+@pattern='^A'
 
 SELECT c."CustomerID", c."Address", c."City", c."CompanyName", c."ContactName", c."ContactTitle", c."Country", c."Fax", c."Phone", c."PostalCode", c."Region"
 FROM "Customers" AS c
-WHERE c."CompanyName" ~ ('(?p)' || @__pattern_0)
+WHERE c."CompanyName" ~ ('(?p)' || @pattern)
 """);
     }
 
@@ -281,6 +281,292 @@ WHERE c."CompanyName" ~ '(?px)^ A'
         => Assert.Throws<InvalidOperationException>(
             () =>
                 Fixture.CreateContext().Customers.Where(c => Regex.IsMatch(c.CompanyName, "^A", RegexOptions.RightToLeft)).ToList());
+
+    [Theory]
+    [MemberData(nameof(IsAsyncData))]
+    public async Task Regex_Replace_with_constant_pattern_and_replacement(bool async)
+    {
+        await AssertQuery(
+            async,
+            source => source.Set<Customer>().Select(x => Regex.Replace(x.CompanyName, "^A", "B")));
+
+        AssertSql(
+            """
+SELECT regexp_replace(c."CompanyName", '^A', 'B', 'p')
+FROM "Customers" AS c
+"""
+        );
+    }
+
+    [Theory]
+    [MemberData(nameof(IsAsyncData))]
+    public async Task Regex_Replace_with_parameter_pattern_and_replacement(bool async)
+    {
+        var pattern = "^A";
+        var replacement = "B";
+
+        await AssertQuery(
+            async,
+            source => source.Set<Customer>().Select(x => Regex.Replace(x.CompanyName, pattern, replacement)));
+
+        AssertSql(
+            """
+@pattern='^A'
+@replacement='B'
+
+SELECT regexp_replace(c."CompanyName", @pattern, @replacement, 'p')
+FROM "Customers" AS c
+""");
+    }
+
+    [Theory]
+    [MemberData(nameof(IsAsyncData))]
+    public async Task Regex_Replace_with_OptionsNone(bool async)
+    {
+        await AssertQuery(
+            async,
+            source => source.Set<Customer>().Select(x => Regex.Replace(x.CompanyName, "^A", "B", RegexOptions.None)));
+
+        AssertSql(
+            """
+SELECT regexp_replace(c."CompanyName", '^A', 'B', 'p')
+FROM "Customers" AS c
+"""
+        );
+    }
+
+    [Theory]
+    [MemberData(nameof(IsAsyncData))]
+    public async Task Regex_Replace_with_IgnoreCase(bool async)
+    {
+        await AssertQuery(
+            async,
+            source => source.Set<Customer>().Select(x => Regex.Replace(x.CompanyName, "^a", "B", RegexOptions.IgnoreCase)));
+
+        AssertSql(
+            """
+SELECT regexp_replace(c."CompanyName", '^a', 'B', 'pi')
+FROM "Customers" AS c
+"""
+        );
+    }
+
+    [Theory]
+    [MemberData(nameof(IsAsyncData))]
+    public async Task Regex_Replace_with_Multiline(bool async)
+    {
+        await AssertQuery(
+            async,
+            source => source.Set<Customer>().Select(x => Regex.Replace(x.CompanyName, "^A", "B", RegexOptions.Multiline)));
+
+        AssertSql(
+            """
+SELECT regexp_replace(c."CompanyName", '^A', 'B', 'n')
+FROM "Customers" AS c
+"""
+        );
+    }
+
+    [Theory]
+    [MemberData(nameof(IsAsyncData))]
+    public async Task Regex_Replace_with_Singleline(bool async)
+    {
+        await AssertQuery(
+            async,
+            source => source.Set<Customer>().Select(x => Regex.Replace(x.CompanyName, "^A", "B", RegexOptions.Singleline)));
+
+        AssertSql(
+            """
+SELECT regexp_replace(c."CompanyName", '^A', 'B')
+FROM "Customers" AS c
+"""
+        );
+    }
+
+    [Theory]
+    [MemberData(nameof(IsAsyncData))]
+    public async Task Regex_Replace_with_Singleline_and_IgnoreCase(bool async)
+    {
+        await AssertQuery(
+            async,
+            source => source.Set<Customer>()
+                .Select(x => Regex.Replace(x.CompanyName, "^a", "B", RegexOptions.Singleline | RegexOptions.IgnoreCase)));
+
+        AssertSql(
+            """
+SELECT regexp_replace(c."CompanyName", '^a', 'B', 'i')
+FROM "Customers" AS c
+"""
+        );
+    }
+
+    [Theory]
+    [MemberData(nameof(IsAsyncData))]
+    public async Task Regex_Replace_with_IgnorePatternWhitespace(bool async)
+    {
+        await AssertQuery(
+            async,
+            source => source.Set<Customer>().Select(x => Regex.Replace(x.CompanyName, "^ A", "B", RegexOptions.IgnorePatternWhitespace)));
+
+        AssertSql(
+            """
+SELECT regexp_replace(c."CompanyName", '^ A', 'B', 'px')
+FROM "Customers" AS c
+"""
+        );
+    }
+
+    [Fact]
+    public void Regex_Replace_with_unsupported_option()
+        => Assert.Throws<InvalidOperationException>(
+            () => Fixture.CreateContext().Customers
+                .FirstOrDefault(x => Regex.Replace(x.CompanyName, "^A", "foo", RegexOptions.RightToLeft) != null));
+
+    [ConditionalTheory]
+    [MemberData(nameof(IsAsyncData))]
+    [MinimumPostgresVersion(15, 0)]
+    public async Task Regex_Count_with_constant_pattern(bool async)
+    {
+        await AssertQuery(
+            async,
+            cs => cs.Set<Customer>().Select(c => Regex.Count(c.CompanyName, "^A")));
+
+        AssertSql(
+            """
+SELECT regexp_count(c."CompanyName", '^A', 1, 'p')
+FROM "Customers" AS c
+"""
+        );
+    }
+
+    [ConditionalTheory]
+    [MemberData(nameof(IsAsyncData))]
+    [MinimumPostgresVersion(15, 0)]
+    public async Task Regex_Count_with_parameter_pattern(bool async)
+    {
+        var pattern = "^A";
+
+        await AssertQuery(
+            async,
+            cs => cs.Set<Customer>().Select(c => Regex.Count(c.CompanyName, pattern)));
+
+        AssertSql(
+            """
+@pattern='^A'
+
+SELECT regexp_count(c."CompanyName", @pattern, 1, 'p')
+FROM "Customers" AS c
+""");
+    }
+
+    [ConditionalTheory]
+    [MemberData(nameof(IsAsyncData))]
+    [MinimumPostgresVersion(15, 0)]
+    public async Task Regex_Count_with_OptionsNone(bool async)
+    {
+        await AssertQuery(
+            async,
+            cs => cs.Set<Customer>().Select(c => Regex.Count(c.CompanyName, "^A", RegexOptions.None)));
+
+        AssertSql(
+            """
+SELECT regexp_count(c."CompanyName", '^A', 1, 'p')
+FROM "Customers" AS c
+"""
+        );
+    }
+
+    [ConditionalTheory]
+    [MemberData(nameof(IsAsyncData))]
+    [MinimumPostgresVersion(15, 0)]
+    public async Task Regex_Count_with_IgnoreCase(bool async)
+    {
+        await AssertQuery(
+            async,
+            cs => cs.Set<Customer>().Select(c => Regex.Count(c.CompanyName, "^a", RegexOptions.IgnoreCase)));
+
+        AssertSql(
+            """
+SELECT regexp_count(c."CompanyName", '^a', 1, 'pi')
+FROM "Customers" AS c
+"""
+        );
+    }
+
+    [ConditionalTheory]
+    [MemberData(nameof(IsAsyncData))]
+    [MinimumPostgresVersion(15, 0)]
+    public async Task Regex_Count_with_Multiline(bool async)
+    {
+        await AssertQuery(
+            async,
+            cs => cs.Set<Customer>().Select(c => Regex.Count(c.CompanyName, "^A", RegexOptions.Multiline)));
+
+        AssertSql(
+            """
+SELECT regexp_count(c."CompanyName", '^A', 1, 'n')
+FROM "Customers" AS c
+"""
+        );
+    }
+
+    [ConditionalTheory]
+    [MemberData(nameof(IsAsyncData))]
+    [MinimumPostgresVersion(15, 0)]
+    public async Task Regex_Count_with_Singleline(bool async)
+    {
+        await AssertQuery(
+            async,
+            cs => cs.Set<Customer>().Select(c => Regex.Count(c.CompanyName, "^A", RegexOptions.Singleline)));
+
+        AssertSql(
+            """
+SELECT regexp_count(c."CompanyName", '^A')
+FROM "Customers" AS c
+"""
+        );
+    }
+
+    [ConditionalTheory]
+    [MemberData(nameof(IsAsyncData))]
+    [MinimumPostgresVersion(15, 0)]
+    public async Task Regex_Count_with_Singleline_and_IgnoreCase(bool async)
+    {
+        await AssertQuery(
+            async,
+            cs => cs.Set<Customer>().Select(c => Regex.Count(c.CompanyName, "^a", RegexOptions.Singleline | RegexOptions.IgnoreCase)));
+
+        AssertSql(
+            """
+SELECT regexp_count(c."CompanyName", '^a', 1, 'i')
+FROM "Customers" AS c
+"""
+        );
+    }
+
+    [ConditionalTheory]
+    [MemberData(nameof(IsAsyncData))]
+    [MinimumPostgresVersion(15, 0)]
+    public async Task Regex_Count_with_IgnorePatternWhitespace(bool async)
+    {
+        await AssertQuery(
+            async,
+            cs => cs.Set<Customer>().Select(c => Regex.Count(c.CompanyName, "^ A", RegexOptions.IgnorePatternWhitespace)));
+
+        AssertSql(
+            """
+SELECT regexp_count(c."CompanyName", '^ A', 1, 'px')
+FROM "Customers" AS c
+"""
+        );
+    }
+
+    [ConditionalFact]
+    [MinimumPostgresVersion(15, 0)]
+    public void Regex_Count_with_unsupported_option()
+        => Assert.Throws<InvalidOperationException>(
+            () => Fixture.CreateContext().Customers
+                .FirstOrDefault(x => Regex.Count(x.CompanyName, "^A", RegexOptions.RightToLeft) != 0));
 
     #endregion Regex
 
@@ -842,6 +1128,70 @@ GROUP BY o."ProductID"
     }
 
     #endregion Statistics
+
+    #region NullIf
+
+    [Theory]
+    [MemberData(nameof(IsAsyncData))]
+    public async Task NullIf_with_equality_left_sided(bool async)
+    {
+        await AssertQuery(
+            async,
+            cs => cs.Set<Order>().Select(x => x.OrderID == 1 ? (int?)null : x.OrderID));
+
+        AssertSql(
+            """
+SELECT NULLIF(o."OrderID", 1)
+FROM "Orders" AS o
+""");
+    }
+
+    [Theory]
+    [MemberData(nameof(IsAsyncData))]
+    public async Task NullIf_with_equality_right_sided(bool async)
+    {
+        await AssertQuery(
+            async,
+            cs => cs.Set<Order>().Select(x => 1 == x.OrderID ? (int?)null : x.OrderID));
+
+        AssertSql(
+            """
+SELECT NULLIF(o."OrderID", 1)
+FROM "Orders" AS o
+""");
+    }
+
+    [Theory]
+    [MemberData(nameof(IsAsyncData))]
+    public async Task NullIf_with_inequality_left_sided(bool async)
+    {
+        await AssertQuery(
+            async,
+            cs => cs.Set<Order>().Select(x => x.OrderID != 1 ? x.OrderID : (int?)null));
+
+        AssertSql(
+            """
+SELECT NULLIF(o."OrderID", 1)
+FROM "Orders" AS o
+""");
+    }
+
+    [Theory]
+    [MemberData(nameof(IsAsyncData))]
+    public async Task NullIf_with_inequality_right_sided(bool async)
+    {
+        await AssertQuery(
+            async,
+            cs => cs.Set<Order>().Select(x => 1 != x.OrderID ? x.OrderID : (int?)null));
+
+        AssertSql(
+            """
+SELECT NULLIF(o."OrderID", 1)
+FROM "Orders" AS o
+""");
+    }
+
+    #endregion
 
     #region Unsupported
 

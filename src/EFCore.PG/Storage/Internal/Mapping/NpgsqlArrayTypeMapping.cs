@@ -132,7 +132,7 @@ public class NpgsqlArrayTypeMapping<TCollection, TConcreteCollection, TElement> 
         var comparer = typeof(TCollection).IsArray && typeof(TCollection).GetArrayRank() > 1
             ? null // TODO: Value comparer for multidimensional arrays
             : (ValueComparer?)Activator.CreateInstance(
-                elementType.IsNullableValueType()
+                elementType.IsNullableValueType() || elementMapping.Comparer.Type.IsNullableValueType()
                     ? typeof(ListOfNullableValueTypesComparer<,>)
                         .MakeGenericType(typeof(TConcreteCollection), elementType.UnwrapNullableType())
                     : elementType.IsValueType
@@ -190,7 +190,7 @@ public class NpgsqlArrayTypeMapping<TCollection, TConcreteCollection, TElement> 
         // Otherwise let the ADO.NET layer infer the PostgreSQL type. We can't always let it infer, otherwise
         // when given a byte[] it will infer byte (but we want smallint[])
         NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Array
-            | (ElementTypeMapping is INpgsqlTypeMapping elementNpgsqlTypeMapping
+            | (ElementTypeMapping is INpgsqlTypeMapping { NpgsqlDbType: not NpgsqlTypes.NpgsqlDbType.Unknown } elementNpgsqlTypeMapping
                 ? elementNpgsqlTypeMapping.NpgsqlDbType
                 : ElementTypeMapping.DbType.HasValue
                     ? new NpgsqlParameter { DbType = ElementTypeMapping.DbType.Value }.NpgsqlDbType
